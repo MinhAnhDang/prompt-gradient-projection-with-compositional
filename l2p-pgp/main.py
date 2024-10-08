@@ -51,6 +51,7 @@ def main(args):
         args.model,
         pretrained=args.pretrained,
         num_classes=args.nb_classes,
+        num_tasks=args.num_tasks,
         drop_rate=args.drop,
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
@@ -61,6 +62,7 @@ def main(args):
         args.model,
         pretrained=args.pretrained,
         num_classes=args.nb_classes,
+        num_tasks=args.num_tasks,
         drop_rate=args.drop,
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
@@ -74,6 +76,7 @@ def main(args):
         batchwise_prompt=args.batchwise_prompt,
         prompt_key_init=args.prompt_key_init,
         head_type=args.head_type,
+        composition=args.composition,
         use_prompt_mask=args.use_prompt_mask,
     )
     original_model.to(device)

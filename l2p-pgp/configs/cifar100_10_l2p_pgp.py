@@ -95,6 +95,7 @@ def get_args_parser(subparsers):
 
     # ViT parameters
     subparsers.add_argument('--global_pool', default='token', choices=['token', 'avg'], type=str, help='type of global pooling for final sequence')
+    subparsers.add_argument('--composition', default=False,  type=bool, help='if using composition learning')
     subparsers.add_argument('--head_type', default='prompt', choices=['token', 'gap', 'prompt', 'token+prompt'], type=str, help='input type of classification head')
     subparsers.add_argument('--freeze', default=['blocks', 'patch_embed', 'cls_token', 'norm', 'pos_embed'], nargs='*', type=list, help='freeze part in backbone model')
 

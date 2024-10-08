@@ -287,9 +287,20 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
                         model.prompt.prompt_key[cur_idx] = model.prompt.prompt_key[prev_idx]
                         optimizer.param_groups[0]['params'] = model.parameters()
      
+        # Freeze prototype of other classes but not current classes
+        print("----------Training parameters-----------")
+        for name, params in model.named_parameters():
+            if args.composition:
+                if name.startswith('head') and int(name[-1]) != task_id:
+                    params.requires_grad = False
+            if params.requires_grad:
+                print(name)   
+                
         # Create new optimizer for each task to clear optimizer status
         if task_id > 0 and args.reinit_optimizer:
             optimizer = create_optimizer(args, model)
+            
+        print("----------------Training----------------")            
         
         for epoch in range(args.epochs):
             train_stats = train_one_epoch(model=model, original_model=original_model, criterion=criterion,

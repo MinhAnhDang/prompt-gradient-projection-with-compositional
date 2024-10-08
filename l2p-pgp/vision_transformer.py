@@ -330,12 +330,12 @@ class VisionTransformer(nn.Module):
     """
 
     def __init__(
-            self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, global_pool='token',
+            self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, num_tasks=10,global_pool='token',
             embed_dim=768, depth=12, num_heads=12, mlp_ratio=4., qkv_bias=True, init_values=None,
             class_token=True, no_embed_class=False, fc_norm=None, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
             weight_init='', embed_layer=PatchEmbed, norm_layer=None, act_layer=None, block_fn=Block,
             prompt_length=None, embedding_key='cls', prompt_init='uniform', prompt_pool=False, prompt_key=False, pool_size=None,
-            top_k=None, batchwise_prompt=False, prompt_key_init='uniform', head_type='token', use_prompt_mask=False,):
+            top_k=None, batchwise_prompt=False, prompt_key_init='uniform', head_type='token', composition=False, use_prompt_mask=False):
         """
         Args:
             img_size (int, tuple): input image size
@@ -370,6 +370,7 @@ class VisionTransformer(nn.Module):
 
         self.img_size = img_size
         self.num_classes = num_classes
+        self.num_tasks = num_tasks
         self.global_pool = global_pool
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.class_token = class_token
@@ -392,6 +393,7 @@ class VisionTransformer(nn.Module):
         self.head_type = head_type
         self.use_prompt_mask = use_prompt_mask
         
+        
         if prompt_length is not None and pool_size is not None and prompt_pool: 
             self.prompt = Prompt(length=prompt_length, embed_dim=embed_dim, embedding_key=embedding_key, prompt_init=prompt_init,
                     prompt_pool=prompt_pool, prompt_key=prompt_key, pool_size=pool_size, top_k=top_k, batchwise_prompt=batchwise_prompt,
@@ -406,9 +408,18 @@ class VisionTransformer(nn.Module):
         self.norm = norm_layer(embed_dim) if not use_fc_norm else nn.Identity()
 
         # Classifier Head
+        self.composition = composition
         self.fc_norm = norm_layer(embed_dim) if use_fc_norm else nn.Identity()
-        self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
-
+        if not self.composition:
+            self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        else:
+            self.num_primitives = 16
+            classes_per_task = int(num_classes/num_tasks)
+            proto_shape = (classes_per_task, self.num_primitives, self.embed_dim)
+            self.head = nn.ParameterList([nn.Parameter(torch.randn(proto_shape)) for task in range(num_tasks)]) if num_classes > 0 else nn.Identity()
+            for proto_group in self.head:
+                nn.init.uniform_(proto_group, -1, 1)
+        
         if weight_init != 'skip':
             self.init_weights(weight_init)
 
@@ -454,8 +465,42 @@ class VisionTransformer(nn.Module):
         if global_pool is not None:
             assert global_pool in ('', 'avg', 'token')
             self.global_pool = global_pool
-        self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        # self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        if not self.composition:
+            self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        else:
+            self.num_primitives = 16
+            classes_per_task = int(num_classes/self.num_tasks)
+            proto_shape = (classes_per_task, self.num_primitives, self.embed_dim)
+            self.head = nn.ParameterList([nn.Parameter(torch.randn(proto_shape)) for task in range(self.num_tasks)]) if num_classes > 0 else nn.Identity()
+            for proto_group in self.head:
+                nn.init.uniform_(proto_group, -1, 1)
 
+    def cka_logits(self, feat, proto):
+        # equivalent to linear_CKA, batch computation
+        # feat: [b, c, h*w] [b, h*w, c]
+        # proto: [num_classes, c, hp*wp] [num_classes, hp*wp, c]
+        def centering(feat):
+            assert len(feat.shape) == 3
+            return feat - torch.mean(feat, dim=1, keepdims=True)
+        
+        def cka(va, vb):
+            return torch.norm(torch.matmul(va.t(), vb)) ** 2 / (torch.norm(torch.matmul(va.t(), va)) * torch.norm(torch.matmul(vb.t(), vb)))
+        
+        proto = centering(proto); feat = centering(feat)
+
+        ### equivalent implementation ###
+        proto = proto.unsqueeze(0) # [1, num_classes, c, hp*wp]  [1 num_classes, hp*wp, c]
+        feat = feat.unsqueeze(1) # [b, 1, c, h*w] [b, 1,  h*w, c]
+
+        cross_norm = torch.norm(torch.matmul(feat, proto.permute(0, 1, 3, 2)), dim=[2,3]) ** 2 # [b, num_classes]
+        feat_norm = torch.norm(torch.matmul(feat, feat.permute(0, 1, 3, 2)), dim=[2,3]) # [b, 1]
+        proto_norm = torch.norm(torch.matmul(proto, proto.permute(0, 1, 3, 2)), dim=[2,3]) # [1, num_classes]
+
+        logits = cross_norm / (feat_norm * proto_norm) # [b, num_classes]
+
+        return logits
+    
     def forward_features(self, x, task_id=-1, cls_features=None, train=False):
         x = self.patch_embed(x)
         self.act['rep'] = x
@@ -495,22 +540,27 @@ class VisionTransformer(nn.Module):
         if self.class_token and self.head_type == 'token':
             x = x[:, 0]
         elif self.head_type == 'gap' and self.global_pool == 'avg':
-            x = x.mean(dim=1)
+            x = x
         elif self.head_type == 'prompt' and self.prompt_pool:
             x = x[:, 1:(1 + self.total_prompt_len)] if self.class_token else x[:, 0:self.total_prompt_len]
-            x = x.mean(dim=1)
         elif self.head_type == 'token+prompt' and self.prompt_pool and self.class_token:
             x = x[:, 0:self.total_prompt_len + 1]
-            x = x.mean(dim=1)
         else:
             raise ValueError(f'Invalid classifier={self.classifier}')
-        
+        if not self.composition and len(x.shape) == 3:
+            x = x.mean(dim=1)
         res['pre_logits'] = x
-
         x = self.fc_norm(x)
-        
-        res['logits'] = self.head(x)
-        
+        # print("Before classifier head: ", x.shape)
+        if not self.composition:
+            res['logits'] = self.head(x)
+        else:
+            proto = torch.cat([proto_group for proto_group in self.head])
+            if self.head_type == 'token':
+                res['logits'] = self.cka_logits(x.unsqueeze(1), proto)
+            else:
+                res['logits'] = self.cka_logits(x, proto)
+        # print("After classifier head: ", res['logits'].shape)
         return res
 
     def forward(self, x, task_id=-1, cls_features=None, train=False):
