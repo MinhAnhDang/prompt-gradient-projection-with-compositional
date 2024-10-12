@@ -79,17 +79,17 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
             not_mask = torch.tensor(not_mask, dtype=torch.int64).to(device)
             logits = logits.index_fill(dim=1, index=not_mask, value=float('-inf'))
             loss = criterion(logits, target) # base criterion (CrossEntropyLoss)
-            print("Base loss: ", loss)
+            # print("Base loss: ", loss)
             if model.composition:
                 map_metric_logits = map_metric_logits.index_fill(dim=1, index=not_mask, value=float('-inf'))                
                 map_metric_loss = criterion(map_metric_logits, target)
                 loss = args.backbone_feat_cls_weight*loss + args.map_metric_cls_weight*map_metric_loss
-                print("Base+Compare loss: ", loss)
+                # print("Base+Compare loss: ", loss)
                 if args.primitive_recon_cls_weight != 0:
                     recon_map_logits = recon_map_logits.index_fill(dim=1, index=not_mask, value=float('-inf'))
                     recon_loss = criterion(recon_map_logits, target)
                     loss += args.primitive_recon_cls_weight * recon_loss   
-                    print("Total loss: ", loss)   
+                    # print("Total loss: ", loss)   
                 
         if args.pull_constraint and 'reduce_sim' in output:
             loss = loss - args.pull_constraint_coeff * output['reduce_sim']
