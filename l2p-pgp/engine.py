@@ -155,6 +155,9 @@ def evaluate(model: torch.nn.Module, original_model: torch.nn.Module, data_loade
             
             output = model(input, task_id=task_id, cls_features=cls_features)
             logits = output['logits']
+            feat_map = output['final_map']
+            if model.composition:
+                map_metric_logits = model.map_metric_logits(feat=feat_map)
 
             if args.task_inc and class_mask is not None:
                 #adding mask to output logits
@@ -163,19 +166,37 @@ def evaluate(model: torch.nn.Module, original_model: torch.nn.Module, data_loade
                 logits_mask = torch.ones_like(logits, device=device) * float('-inf')
                 logits_mask = logits_mask.index_fill(1, mask, 0.0)
                 logits = logits + logits_mask
-
+                if model.composition:
+                    map_metric_logits = map_metric_logits + logits_mask
+                    combine_logits = map_metric_logits + logits
             loss = criterion(logits, target)
-
+            
             acc1, acc5 = accuracy(logits, target, topk=(1, 5))
+            
 
             metric_logger.meters['Loss'].update(loss.item())
             metric_logger.meters['Acc@1'].update(acc1.item(), n=input.shape[0])
             metric_logger.meters['Acc@5'].update(acc5.item(), n=input.shape[0])
+            if model.composition:
+                map_metric_loss = criterion(map_metric_logits, target)
+                ind_acc1, ind_acc5 = accuracy(map_metric_logits, target, topk=(1, 5))
+                combine_acc1, combine_acc5 = accuracy(map)
+                
+                metric_logger.meters['Map_metric_loss'].update(map_metric_loss.item())
+                metric_logger.meters['Ind_acc@1'].update(ind_acc1.item(), n=input.shape[0])
+                metric_logger.meters['Ind_acc@5'].update(ind_acc5.item(), n=input.shape[0])
+                metric_logger.meters['Combine_acc@1'].update(combine_acc1.item(), n=input.shape[0])
+                metric_logger.meters['Combine_acc@5'].update(combine_acc5.item(), n=input.shape[0])
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
           .format(top1=metric_logger.meters['Acc@1'], top5=metric_logger.meters['Acc@5'], losses=metric_logger.meters['Loss']))
+    if model.composition:
+        print('* Ind_Acc@1 {top1.global_avg:.3f} Ind_Acc@5 {top5.global_avg:.3f} map_loss {losses.global_avg:.3f}'
+            .format(top1=metric_logger.meters['Ind_acc@1'], top5=metric_logger.meters['Ind_acc@5'], losses=metric_logger.meters['Map_metric_loss']))
+        print('* Combine_Acc@1 {top1.global_avg:.3f} Combine_Acc@5 {top5.global_avg:.3f} '
+            .format(top1=metric_logger.meters['Combine_acc@1'], top5=metric_logger.meters['Combine_acc@5']))
 
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
