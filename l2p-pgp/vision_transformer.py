@@ -419,7 +419,7 @@ class VisionTransformer(nn.Module):
         
         self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
         if self.composition:
-            self.proto = nn.ParameterList(nn.Parameter(torch.empty(num_classes, self.embed_dim, 16)) for _ in range(num_tasks))
+            self.proto = nn.ParameterList(nn.Parameter(torch.empty(self.classes_per_task, self.embed_dim, 16)) for _ in range(num_tasks))
             for i in range(num_tasks):
                 nn.init.kaiming_uniform_(self.proto[i], a=math.sqrt(5))
             # self.fc_map_base = nn.Parameter(torch.empty(num_classes, self.embed_dim, 16))
@@ -533,9 +533,9 @@ class VisionTransformer(nn.Module):
             else:
                 base_proto = torch.cat([p for p in self.proto[:task_id]])
         bc, c, s = base_proto.shape
+        print(bc, c, s)
         assert feat is not None, f"Feat is None"
         if is_base:
-            
             base_proto = base_proto - base_proto.mean(dim=1, keepdim=True) #bc, c, s
             feat = feat - feat.mean(dim=2, keepdim=True)        #batch_size, s, c
             base_proto = base_proto.permute(0, 2, 1).reshape(bc*s, c) #bc*s, c
