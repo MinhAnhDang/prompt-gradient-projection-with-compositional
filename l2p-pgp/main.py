@@ -78,6 +78,8 @@ def main(args):
         head_type=args.head_type,
         composition=args.composition,
         use_prompt_mask=args.use_prompt_mask,
+        map_pow = args.map_pow,
+        aux_param = args.aux_param,
     )
     original_model.to(device)
     model.to(device)  
@@ -116,8 +118,8 @@ def main(args):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
     
-    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print('number of params:', n_parameters)
+    # n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    # print('number of params:', n_parameters)
 
     if args.unscale_lr:
         global_batch_size = args.batch_size

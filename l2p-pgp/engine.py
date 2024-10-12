@@ -33,11 +33,11 @@ import memory
 def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module, 
                     criterion, data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, feature_mat, key_feature_mat, max_norm: float = 0,
-                    set_training_mode=True, task_id=-1, class_mask=None, args = None,):
+                    set_training_mode=True, task_id=-1, class_mask=None, args = None):
 
     model.train(set_training_mode)
     original_model.eval()
-
+    is_base = True if task_id == 0 else False
     if args.distributed and utils.get_world_size() > 1:
         data_loader.sampler.set_epoch(epoch)
 
@@ -59,6 +59,17 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
         
         output = model(input, task_id=task_id, cls_features=cls_features, train=set_training_mode)
         logits = output['logits']
+        feat_map = output['final_map']
+        if model.composition:
+            if not args.distributed:
+                map_metric_logits = model.map_metric_logits(feat=feat_map)
+                if args.primitive_recon_cls_weight != 0:
+                    recon_map_logits = model.map_metric_recon_logits(feat=feat_map, is_base=is_base)
+            else:
+                map_metric_logits = model.modules.map_metric_logits()
+                if args.primitive_recon_cls_weight != 0:
+                    recon_map_logits = model.modules.map_metric_recon_logits(feat=feat_map, is_base=is_base)
+        
         prompt_idx = output['prompt_idx'][0]
 
         # here is the trick to mask out classes of non-current tasks
@@ -67,8 +78,19 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
             not_mask = np.setdiff1d(np.arange(args.nb_classes), mask)
             not_mask = torch.tensor(not_mask, dtype=torch.int64).to(device)
             logits = logits.index_fill(dim=1, index=not_mask, value=float('-inf'))
-
-        loss = criterion(logits, target) # base criterion (CrossEntropyLoss)
+            loss = criterion(logits, target) # base criterion (CrossEntropyLoss)
+            print("Base loss: ", loss)
+            if model.composition:
+                map_metric_logits = map_metric_logits.index_fill(dim=1, index=not_mask, value=float('-inf'))                
+                map_metric_loss = criterion(map_metric_logits, target)
+                loss = args.backbone_feat_cls_weight*loss + args.map_metric_cls_weight*map_metric_loss
+                print("Base+Compare loss: ", loss)
+                if args.primitive_recon_cls_weight != 0:
+                    recon_map_logits = recon_map_logits.index_fill(dim=1, index=not_mask, value=float('-inf'))
+                    recon_loss = criterion(recon_map_logits, target)
+                    loss += args.primitive_recon_cls_weight * recon_loss   
+                    print("Total loss: ", loss)   
+                
         if args.pull_constraint and 'reduce_sim' in output:
             loss = loss - args.pull_constraint_coeff * output['reduce_sim']
 
@@ -286,16 +308,20 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
                         model.prompt.prompt_key.grad.zero_()
                         model.prompt.prompt_key[cur_idx] = model.prompt.prompt_key[prev_idx]
                         optimizer.param_groups[0]['params'] = model.parameters()
-     
-        # Freeze prototype of other classes but not current classes
-        print("----------Training parameters-----------")
+    
+                    
+        print("----------Training Paramenters----------")
         for name, params in model.named_parameters():
-            if args.composition:
-                if name.startswith('head') and int(name[-1]) != task_id:
-                    params.requires_grad = False
+            if 'proto' in name and int(name[-1]) != task_id:
+                params.requires_grad = False
             if params.requires_grad:
-                print(name)   
-                
+                print(name)    
+        print("----------------------------------------")       
+        n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print('Number of trainable params:', n_parameters)
+        print("----------------------------------------")       
+        n_parameters = sum(p.numel() for p in model.parameters())
+        print('Total number of params:', n_parameters)                 
         # Create new optimizer for each task to clear optimizer status
         if task_id > 0 and args.reinit_optimizer:
             optimizer = create_optimizer(args, model)

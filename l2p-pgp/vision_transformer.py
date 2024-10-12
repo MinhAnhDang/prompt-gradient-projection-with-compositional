@@ -335,7 +335,8 @@ class VisionTransformer(nn.Module):
             class_token=True, no_embed_class=False, fc_norm=None, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
             weight_init='', embed_layer=PatchEmbed, norm_layer=None, act_layer=None, block_fn=Block,
             prompt_length=None, embedding_key='cls', prompt_init='uniform', prompt_pool=False, prompt_key=False, pool_size=None,
-            top_k=None, batchwise_prompt=False, prompt_key_init='uniform', head_type='token', composition=False, use_prompt_mask=False):
+            top_k=None, batchwise_prompt=False, prompt_key_init='uniform', head_type='token', composition=False, use_prompt_mask=False,
+            map_pow=1.0, aux_param=1.0, temperature=1.0):
         """
         Args:
             img_size (int, tuple): input image size
@@ -371,6 +372,7 @@ class VisionTransformer(nn.Module):
         self.img_size = img_size
         self.num_classes = num_classes
         self.num_tasks = num_tasks
+        self.classes_per_task = int(self.num_classes/self.num_tasks)
         self.global_pool = global_pool
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.class_token = class_token
@@ -392,8 +394,12 @@ class VisionTransformer(nn.Module):
         self.prompt_pool = prompt_pool
         self.head_type = head_type
         self.use_prompt_mask = use_prompt_mask
+        self.map_pow = map_pow
+        self.aux_param = aux_param
         
-        
+        if temperature < 0:
+            self.temperature = nn.Parameter(torch.tensor(abs(temperature), dtype=torch.float32))
+            
         if prompt_length is not None and pool_size is not None and prompt_pool: 
             self.prompt = Prompt(length=prompt_length, embed_dim=embed_dim, embedding_key=embedding_key, prompt_init=prompt_init,
                     prompt_pool=prompt_pool, prompt_key=prompt_key, pool_size=pool_size, top_k=top_k, batchwise_prompt=batchwise_prompt,
@@ -410,15 +416,15 @@ class VisionTransformer(nn.Module):
         # Classifier Head
         self.composition = composition
         self.fc_norm = norm_layer(embed_dim) if use_fc_norm else nn.Identity()
-        if not self.composition:
-            self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
-        else:
-            self.num_primitives = 16
-            classes_per_task = int(num_classes/num_tasks)
-            proto_shape = (classes_per_task, self.num_primitives, self.embed_dim)
-            self.head = nn.ParameterList([nn.Parameter(torch.randn(proto_shape)) for task in range(num_tasks)]) if num_classes > 0 else nn.Identity()
-            for proto_group in self.head:
-                nn.init.uniform_(proto_group, -1, 1)
+        
+        self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        if self.composition:
+            self.proto = nn.ParameterList(nn.Parameter(torch.empty(num_classes, self.embed_dim, 16)) for _ in range(num_tasks))
+            for i in range(num_tasks):
+                nn.init.kaiming_uniform_(self.proto[i], a=math.sqrt(5))
+            # self.fc_map_base = nn.Parameter(torch.empty(num_classes, self.embed_dim, 16))
+            # nn.init.kaiming_uniform_(self.fc_map_base, a=math.sqrt(5))
+            self.fc_map_temperature = nn.Parameter(torch.tensor(16.0))
         
         if weight_init != 'skip':
             self.init_weights(weight_init)
@@ -478,8 +484,8 @@ class VisionTransformer(nn.Module):
 
     def cka_logits(self, feat, proto):
         # equivalent to linear_CKA, batch computation
-        # feat: [b, c, h*w] [b, h*w, c]
-        # proto: [num_classes, c, hp*wp] [num_classes, hp*wp, c]
+        # feat: original: [b, c, h*w]  our: [batch_size, c, map_size]
+        # proto: original :[num_classes, c, hp*wp]  our: [num_classes, c, s]
         def centering(feat):
             assert len(feat.shape) == 3
             return feat - torch.mean(feat, dim=1, keepdims=True)
@@ -490,17 +496,81 @@ class VisionTransformer(nn.Module):
         proto = centering(proto); feat = centering(feat)
 
         ### equivalent implementation ###
-        proto = proto.unsqueeze(0) # [1, num_classes, c, hp*wp]  [1 num_classes, hp*wp, c]
-        feat = feat.unsqueeze(1) # [b, 1, c, h*w] [b, 1,  h*w, c]
+        proto = proto.unsqueeze(0) # [1, num_classes, c, hp*wp]
+        feat = feat.unsqueeze(1) # [b, 1, c, h*w]
 
-        cross_norm = torch.norm(torch.matmul(feat, proto.permute(0, 1, 3, 2)), dim=[2,3]) ** 2 # [b, num_classes]
-        feat_norm = torch.norm(torch.matmul(feat, feat.permute(0, 1, 3, 2)), dim=[2,3]) # [b, 1]
-        proto_norm = torch.norm(torch.matmul(proto, proto.permute(0, 1, 3, 2)), dim=[2,3]) # [1, num_classes]
+        cross_norm = torch.norm(torch.matmul(feat.permute(0, 1, 3, 2), proto), dim=[2,3]) ** 2 # [b, num_classes]
+        feat_norm = torch.norm(torch.matmul(feat.permute(0, 1, 3, 2), feat), dim=[2,3]) # [b, 1]
+        proto_norm = torch.norm(torch.matmul(proto.permute(0, 1, 3, 2), proto), dim=[2,3]) # [1, num_classes]
 
         logits = cross_norm / (feat_norm * proto_norm) # [b, num_classes]
 
         return logits
     
+    def map_metric_logits(self, proto=None, feat=None):
+        if proto is None:
+            proto = torch.cat([p for p in self.proto], dim=0)
+        assert feat is not None, f"Feat is None"
+        # num_classes, c, s = proto.shape
+        # batch_size, map_size, c = feat.shape
+        
+        feat = feat.permute(0, 2, 1) #batch_size, c, map_size
+        if self.map_pow != 1.0:
+            neg_mask = 1 - torch.sign(torch.sign(feat) + 1)
+            neg_feat = feat * neg_mask
+            feat = F.relu(feat)
+            feat = feat ** self.map_pow
+            feat = feat + neg_feat
+            
+        logits = self.cka_logits(feat, proto)
+        logits *= self.fc_map_temperature
+        return logits
+     
+    def map_metric_recon_logits(self, base_proto=None, feat=None, is_base=False, task_id=-1):
+        if base_proto is None:
+            if is_base:
+                base_proto = torch.cat([p for p in self.proto[:self.classes_per_task]], dim=0)
+            else:
+                base_proto = torch.cat([p for p in self.proto[:(self.classes_per_task*(task_id))]])
+        bc, c, s = base_proto.shape
+        assert feat is not None, f"Feat is None"
+        if is_base:
+            base_proto = base_proto - base_proto.mean(dim=1, keepdim=True) #bc, c, s
+            feat = feat - feat.mean(dim=2, keepdim=True)        #batch_size, s, c
+            base_proto = base_proto.permute(0, 2, 1).reshape(bc*s, c) #bc*s, c
+            novel_proto = base_proto
+            sims = -torch.cdist(novel_proto, base_proto, p=2)**2
+            sims = sims.view(bc, s, bc, s)
+            
+            sims_mask = torch.eye(self.classes_per_task, dtype=torch.int64).unsqueeze(-1).unsqueeze(-1)
+            other_sims = sims - sims_mask*9999
+            other_sims = other_sims.reshape(bc*s, bc*s)
+            #Soft reuse
+            atten = torch.softmax(other_sims*self.aux_param, dim=-1)
+            reused_novel_proto = torch.matmul(atten, base_proto) #bc*s, c
+            
+            reused_novel_proto = reused_novel_proto.reshape(bc, s, c).permute(0, 2, 1).unsqueeze(0) #1, bc, c, s
+            feat = feat.permute(0, 2, 1).unsqueeze(1) #batch_size, 1, c, s
+            
+            cross_norm = torch.norm(torch.matmul(feat.permute(0, 1, 3, 2), reused_novel_proto), dim=[2,3])**2
+            feat_map_norm = torch.norm(torch.matmul(feat.permute(0,1,3,2), feat), dim=[2,3])
+            reused_novel_proto_norm = torch.norm(torch.matmul(reused_novel_proto.permute(0, 1, 3, 2), reused_novel_proto), dim=[2,3])
+            prim_recon_cls_logits = cross_norm/(feat_map_norm*reused_novel_proto_norm +  0.000001)
+            prim_recon_cls_logits *= self.fc_map_temperature
+            return prim_recon_cls_logits
+        else:
+            base_proto = base_proto.permute(0, 2, 1).reshape(bc*s, c) #bc*s, c
+            novel_proto = self.proto[self.classes_per_task*task_id:self.classes_per_task*(task_id+1)] # [novel_class, c, s]
+            nc = novel_proto.shape[0]
+            novel_proto = novel_proto.permute(0,2,1).reshape(nc*s, c) # nc*s, c
+            sims = -torch.cdist(novel_proto, base_proto, p=2)**2 #nc*s, bc*s
+            atten = torch.softmax(sims*self.ft_primitives_recon_tau, dim=-1)
+            reused_novel_proto = torch.matmul(atten, base_proto) #nc*s, c
+            reused_novel_proto = reused_novel_proto.reshape(nc, s, c).permute(0, 2, 1) #nc, c, s   
+            prim_recon_cls_logits = self.map_metric_logits(proto=reused_novel_proto, feat=feat, is_base=is_base)
+        
+            return prim_recon_cls_logits
+       
     def forward_features(self, x, task_id=-1, cls_features=None, train=False):
         x = self.patch_embed(x)
         self.act['rep'] = x
@@ -538,7 +608,7 @@ class VisionTransformer(nn.Module):
     def forward_head(self, res, pre_logits: bool = False):
         x = res['x']
         if self.class_token and self.head_type == 'token':
-            x = x[:, 0]
+            x = x[:, 0].unsqueeze(1)
         elif self.head_type == 'gap' and self.global_pool == 'avg':
             x = x
         elif self.head_type == 'prompt' and self.prompt_pool:
@@ -547,24 +617,20 @@ class VisionTransformer(nn.Module):
             x = x[:, 0:self.total_prompt_len + 1]
         else:
             raise ValueError(f'Invalid classifier={self.classifier}')
-        if not self.composition and len(x.shape) == 3:
-            x = x.mean(dim=1)
+        res['final_map'] = x
+        assert len(x.shape) == 3, f"Feature map shape is not match, expected 3 but got {len(x.shape)}"
+        x = x.mean(dim=1)
         res['pre_logits'] = x
         x = self.fc_norm(x)
+
         # print("Before classifier head: ", x.shape)
-        if not self.composition:
-            res['logits'] = self.head(x)
-        else:
-            proto = torch.cat([proto_group for proto_group in self.head])
-            if self.head_type == 'token':
-                res['logits'] = self.cka_logits(x.unsqueeze(1), proto)
-            else:
-                res['logits'] = self.cka_logits(x, proto)
+        res['logits'] = self.head(x)
         # print("After classifier head: ", res['logits'].shape)
         return res
 
     def forward(self, x, task_id=-1, cls_features=None, train=False):
         res = self.forward_features(x, task_id=task_id, cls_features=cls_features, train=train)
+        # print("Before head: ", res['x'].shape)
         res = self.forward_head(res)
         return res
 

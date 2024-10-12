@@ -21,7 +21,15 @@ def get_args_parser(subparsers):
     subparsers.add_argument('--momentum', type=float, default=0.9, metavar='M', help='SGD momentum (default: 0.9)')
     subparsers.add_argument('--weight-decay', type=float, default=0.0, help='weight decay (default: 0.0)')
     subparsers.add_argument('--reinit_optimizer', type=bool, default=True, help='reinit optimizer (default: True)')
-
+    # Loss weight parameters
+    subparsers.add_argument('--backbone_feat_cls_weight', type=float, default=1.0)
+    subparsers.add_argument('--map_metric_cls_weight', type=float, default=0.0)
+    subparsers.add_argument('--primitive_recon_cls_weight', type=float, default=0.0)
+    
+    subparsers.add_argument('--map_pow', type=float, default=1.0)
+    subparsers.add_argument('--bkb_feat_pow', type=float, default=1.0)
+    subparsers.add_argument('--aux_param', type=float, default=1.0)
+    subparsers.add_argument('--temperature', type=float, default=1.0)
     # Learning rate schedule parameters
     subparsers.add_argument('--sched', default='constant', type=str, metavar='SCHEDULER', help='LR scheduler (default: "constant"')
     subparsers.add_argument('--lr', type=float, default=0.03, metavar='LR', help='learning rate (default: 0.03)')
