@@ -540,12 +540,12 @@ class VisionTransformer(nn.Module):
             feat = feat - feat.mean(dim=2, keepdim=True)        #batch_size, s, c
             base_proto = base_proto.permute(0, 2, 1).reshape(bc*s, c) #bc*s, c
             novel_proto = base_proto
-            print("Base_proto shape", base_proto.shape)
+            # print("Base_proto shape", base_proto.shape)
             sims = -torch.cdist(novel_proto, base_proto, p=2)**2
             sims = sims.view(bc, s, bc, s)
-            print("Sims shape", sims.shape)
+            # print("Sims shape", sims.shape)
             
-            sims_mask = torch.eye(self.classes_per_task, dtype=torch.int64).unsqueeze(1).unsqueeze(-1)
+            sims_mask = torch.eye(self.classes_per_task, dtype=torch.int64).unsqueeze(1).unsqueeze(-1).cuda()
             print("Sims mask shape", sims_mask.shape)
             other_sims = sims - sims_mask*9999
             other_sims = other_sims.reshape(bc*s, bc*s)
