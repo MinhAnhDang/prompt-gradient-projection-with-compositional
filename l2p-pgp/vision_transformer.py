@@ -542,7 +542,7 @@ class VisionTransformer(nn.Module):
             sims = -torch.cdist(novel_proto, base_proto, p=2)**2
             sims = sims.view(bc, s, bc, s)
             
-            sims_mask = torch.eye(self.classes_per_task, dtype=torch.int64).unsqueeze(-1).unsqueeze(-1)
+            sims_mask = torch.eye(self.classes_per_task, dtype=torch.int64).unsqueeze(1).unsqueeze(-1)
             other_sims = sims - sims_mask*9999
             other_sims = other_sims.reshape(bc*s, bc*s)
             #Soft reuse
