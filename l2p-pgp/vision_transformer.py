@@ -533,7 +533,7 @@ class VisionTransformer(nn.Module):
             else:
                 base_proto = torch.cat([p for p in self.proto[:task_id]])
         bc, c, s = base_proto.shape
-        print(bc, c, s)
+        # print(bc, c, s)
         assert feat is not None, f"Feat is None"
         if is_base:
             base_proto = base_proto - base_proto.mean(dim=1, keepdim=True) #bc, c, s
@@ -546,7 +546,7 @@ class VisionTransformer(nn.Module):
             # print("Sims shape", sims.shape)
             
             sims_mask = torch.eye(self.classes_per_task, dtype=torch.int64).unsqueeze(1).unsqueeze(-1).cuda()
-            print("Sims mask shape", sims_mask.shape)
+            # print("Sims mask shape", sims_mask.shape)
             other_sims = sims - sims_mask*9999
             other_sims = other_sims.reshape(bc*s, bc*s)
             #Soft reuse
