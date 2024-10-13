@@ -543,28 +543,34 @@ class VisionTransformer(nn.Module):
             # print("Base_proto shape", base_proto.shape)
             sims = -torch.cdist(novel_proto, base_proto, p=2)**2
             sims = sims.view(bc, s, bc, s)
-            print("Sims shape", sims.shape)
+            # print("Sims shape", sims.shape)
             
             sims_mask = torch.eye(self.classes_per_task, dtype=torch.int32).unsqueeze(1).unsqueeze(-1)
             sims_mask = sims_mask.to(device)
-            print("Sims mask shape", sims_mask.shape)
+            # print("Sims mask shape", sims_mask.shape)
             other_sims = sims - sims_mask*9999
-            print("other_sims", other_sims.shape)
+            # print("other_sims", other_sims.shape)
             other_sims = other_sims.reshape(bc*s, bc*s)
-            print("other_sims reshape", other_sims.shape)
+            # print("other_sims reshape", other_sims.shape)
             #Soft reuse
             atten = torch.softmax(other_sims*self.aux_param, dim=-1)
-            print("atten", atten.shape)
+            # print("atten", atten.shape)
             reused_novel_proto = torch.matmul(atten, base_proto) #bc*s, c
-            print("reused_proto", reused_novel_proto.shape)
+            # print("reused_proto", reused_novel_proto.shape)
             
             reused_novel_proto = reused_novel_proto.reshape(bc, s, c).permute(0, 2, 1).unsqueeze(0) #1, bc, c, s
+            print("reused_proto reshape", reused_novel_proto.shape)
             feat = feat.permute(0, 2, 1).unsqueeze(1) #batch_size, 1, c, s
+            print("feat shape", feat.shape)
             
             cross_norm = torch.norm(torch.matmul(feat.permute(0, 1, 3, 2), reused_novel_proto), dim=[2,3])**2
+            print("cross norm", cross_norm.shape)
             feat_map_norm = torch.norm(torch.matmul(feat.permute(0,1,3,2), feat), dim=[2,3])
+            print("feat norm ", feat_map_norm.shape)
             reused_novel_proto_norm = torch.norm(torch.matmul(reused_novel_proto.permute(0, 1, 3, 2), reused_novel_proto), dim=[2,3])
+            print("reused norm", reused_novel_proto_norm.shape)
             prim_recon_cls_logits = cross_norm/(feat_map_norm*reused_novel_proto_norm +  0.000001)
+            print("final", prim_recon_cls_logits.shape)
             prim_recon_cls_logits *= self.fc_map_temperature
             return prim_recon_cls_logits
         else:
