@@ -585,7 +585,7 @@ class VisionTransformer(nn.Module):
             atten = torch.softmax(sims*self.ft_primitives_recon_tau, dim=-1)
             reused_novel_proto = torch.matmul(atten, base_proto) #nc*s, c
             reused_novel_proto = reused_novel_proto.reshape(nc, s, c).permute(0, 2, 1) #nc, c, s   
-            prim_recon_cls_logits = self.map_metric_logits(proto=reused_novel_proto, feat=feat, is_base=is_base)
+            prim_recon_cls_logits = self.map_metric_logits(proto=reused_novel_proto, feat=feat)
         
             return prim_recon_cls_logits #nc, c, s
        
