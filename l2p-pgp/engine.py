@@ -86,9 +86,9 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                 loss = args.backbone_feat_cls_weight*loss + args.map_metric_cls_weight*map_metric_loss
                 # print("Base+Compare loss: ", loss)
                 if args.primitive_recon_cls_weight != 0:
-                    print(map_metric_logits[:, mask])
+                    # print(map_metric_logits[:, mask])
                     map_metric_logits[:, mask] = recon_map_logits
-                    print(map_metric_logits[:, mask])
+                    # print(map_metric_logits[:, mask])
                     recon_loss = criterion(recon_map_logits, target)
                     loss += args.primitive_recon_cls_weight * recon_loss   
                     print("Total loss: ", loss)   
@@ -213,11 +213,11 @@ def evaluate_till_now(model: torch.nn.Module, original_model: torch.nn.Module, d
         test_stats = evaluate(model=model, original_model=original_model, data_loader=data_loader[i]['val'], 
                               device=device, task_id=i, class_mask=class_mask, args=args)
 
-        stat_matrix[0, i] = test_stats['Acc@1']
-        stat_matrix[1, i] = test_stats['Acc@5']
-        stat_matrix[2, i] = test_stats['Loss']
+        stat_matrix[0, i] = test_stats['Combine_acc@1']
+        stat_matrix[1, i] = test_stats['Combine_acc@5']
+        stat_matrix[2, i] = test_stats['Loss']+test_stats['Map_metric_loss']
 
-        acc_matrix[i, task_id] = test_stats['Acc@1']
+        acc_matrix[i, task_id] = test_stats['Combine_acc@1']
     
     avg_stat = np.divide(np.sum(stat_matrix, axis=1), task_id+1)
 
