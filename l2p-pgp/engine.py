@@ -91,7 +91,7 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                     # print(map_metric_logits[:, mask])
                     recon_loss = criterion(recon_map_logits, target)
                     loss += args.primitive_recon_cls_weight * recon_loss   
-                    print("Total loss: ", loss)   
+                    # print("Total loss: ", loss)   
                 
         if args.pull_constraint and 'reduce_sim' in output:
             loss = loss - args.pull_constraint_coeff * output['reduce_sim']
