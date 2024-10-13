@@ -86,10 +86,9 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                 loss = args.backbone_feat_cls_weight*loss + args.map_metric_cls_weight*map_metric_loss
                 # print("Base+Compare loss: ", loss)
                 if args.primitive_recon_cls_weight != 0:
-                    print("target shape", target.shape)
-                    print(target)
-                    print("recon logits shape", recon_map_logits.shape)
-                    target = target[:, mask]
+                    print(map_metric_logits[:, mask])
+                    map_metric_logits[:, mask] = recon_map_logits
+                    print(map_metric_logits[:, mask])
                     recon_loss = criterion(recon_map_logits, target)
                     loss += args.primitive_recon_cls_weight * recon_loss   
                     print("Total loss: ", loss)   
