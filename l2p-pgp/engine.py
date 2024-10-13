@@ -168,7 +168,7 @@ def evaluate(model: torch.nn.Module, original_model: torch.nn.Module, data_loade
                 logits = logits + logits_mask
                 if model.composition:
                     map_metric_logits = map_metric_logits + logits_mask
-                    combine_logits = map_metric_logits + logits
+                    combine_logits = (map_metric_logits + logits)/2
             loss = criterion(logits, target)
             
             acc1, acc5 = accuracy(logits, target, topk=(1, 5))
@@ -180,7 +180,7 @@ def evaluate(model: torch.nn.Module, original_model: torch.nn.Module, data_loade
             if model.composition:
                 map_metric_loss = criterion(map_metric_logits, target)
                 ind_acc1, ind_acc5 = accuracy(map_metric_logits, target, topk=(1, 5))
-                combine_acc1, combine_acc5 = accuracy(map_metric_logits+logits, target, topk=(1,5))
+                combine_acc1, combine_acc5 = accuracy(combine_logits, target, topk=(1,5))
                 
                 metric_logger.meters['Map_metric_loss'].update(map_metric_loss.item())
                 metric_logger.meters['Ind_acc@1'].update(ind_acc1.item(), n=input.shape[0])
@@ -335,6 +335,8 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
         for name, params in model.named_parameters():
             if 'proto' in name and int(name[-1]) != task_id:
                 params.requires_grad = False
+            elif 'proto' in name and int(name[-1]) == task_id: 
+                params.requires_grad = True
             if params.requires_grad:
                 print(name)    
         print("----------------------------------------")       
