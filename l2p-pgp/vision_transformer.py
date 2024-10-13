@@ -336,7 +336,7 @@ class VisionTransformer(nn.Module):
             weight_init='', embed_layer=PatchEmbed, norm_layer=None, act_layer=None, block_fn=Block,
             prompt_length=None, embedding_key='cls', prompt_init='uniform', prompt_pool=False, prompt_key=False, pool_size=None,
             top_k=None, batchwise_prompt=False, prompt_key_init='uniform', head_type='token', composition=False, use_prompt_mask=False,
-            map_pow=1.0, aux_param=1.0, temperature=1.0, ft_primitives_recon_tau=16.0):
+            map_pow=1.0, aux_param=1.0, temperature=1.0, ft_prim_recon_tau=16.0):
         """
         Args:
             img_size (int, tuple): input image size
@@ -396,7 +396,7 @@ class VisionTransformer(nn.Module):
         self.use_prompt_mask = use_prompt_mask
         self.map_pow = map_pow
         self.aux_param = aux_param
-        self.ft_primitives_recon_tau = ft_primitives_recon_tau
+        self.ft_primitives_recon_tau = ft_prim_recon_tau
         
         if temperature < 0:
             self.temperature = nn.Parameter(torch.tensor(abs(temperature), dtype=torch.float32))
