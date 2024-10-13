@@ -75,7 +75,6 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
         # here is the trick to mask out classes of non-current tasks
         if args.train_mask and class_mask is not None:
             mask = class_mask[task_id]
-            print(mask)
             not_mask = np.setdiff1d(np.arange(args.nb_classes), mask)
             not_mask = torch.tensor(not_mask, dtype=torch.int64).to(device)
             logits = logits.index_fill(dim=1, index=not_mask, value=float('-inf'))
@@ -87,7 +86,7 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                 loss = args.backbone_feat_cls_weight*loss + args.map_metric_cls_weight*map_metric_loss
                 # print("Base+Compare loss: ", loss)
                 if args.primitive_recon_cls_weight != 0:
-                    target = target[mask]
+                    target = target[:, mask]
                     recon_loss = criterion(recon_map_logits, target)
                     loss += args.primitive_recon_cls_weight * recon_loss   
                     # print("Total loss: ", loss)   

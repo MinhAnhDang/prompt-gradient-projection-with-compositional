@@ -560,20 +560,20 @@ class VisionTransformer(nn.Module):
             # print("reused_proto", reused_novel_proto.shape)
             
             reused_novel_proto = reused_novel_proto.reshape(bc, s, c).permute(0, 2, 1).unsqueeze(0) #1, bc, c, s
-            print("reused_proto reshape", reused_novel_proto.shape)
+            # print("reused_proto reshape", reused_novel_proto.shape)
             feat = feat.permute(0, 2, 1).unsqueeze(1) #batch_size, 1, c, s
-            print("feat shape", feat.shape)
+            # print("feat shape", feat.shape)
             
             cross_norm = torch.norm(torch.matmul(feat.permute(0, 1, 3, 2), reused_novel_proto), dim=[2,3])**2
-            print("cross norm", cross_norm.shape)
+            # print("cross norm", cross_norm.shape)
             feat_map_norm = torch.norm(torch.matmul(feat.permute(0,1,3,2), feat), dim=[2,3])
-            print("feat norm ", feat_map_norm.shape)
+            # print("feat norm ", feat_map_norm.shape)
             reused_novel_proto_norm = torch.norm(torch.matmul(reused_novel_proto.permute(0, 1, 3, 2), reused_novel_proto), dim=[2,3])
-            print("reused norm", reused_novel_proto_norm.shape)
+            # print("reused norm", reused_novel_proto_norm.shape)
             prim_recon_cls_logits = cross_norm/(feat_map_norm*reused_novel_proto_norm +  0.000001)
             
             prim_recon_cls_logits *= self.fc_map_temperature
-            print("final", prim_recon_cls_logits.shape)
+            # print("final", prim_recon_cls_logits.shape)
             return prim_recon_cls_logits
         else:
             base_proto = base_proto.permute(0, 2, 1).reshape(bc*s, c) #bc*s, c
