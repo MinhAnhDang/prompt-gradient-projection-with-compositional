@@ -87,6 +87,7 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                 # print("Base+Compare loss: ", loss)
                 if args.primitive_recon_cls_weight != 0:
                     print("target shape", target.shape)
+                    print(target)
                     print("recon logits shape", recon_map_logits.shape)
                     target = target[:, mask]
                     recon_loss = criterion(recon_map_logits, target)
