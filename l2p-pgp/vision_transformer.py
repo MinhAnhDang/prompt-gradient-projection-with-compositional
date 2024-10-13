@@ -551,9 +551,12 @@ class VisionTransformer(nn.Module):
             other_sims = sims - sims_mask*9999
             print("other_sims", other_sims.shape)
             other_sims = other_sims.reshape(bc*s, bc*s)
+            print("other_sims reshape", other_sims.shape)
             #Soft reuse
             atten = torch.softmax(other_sims*self.aux_param, dim=-1)
+            print("atten", atten.shape)
             reused_novel_proto = torch.matmul(atten, base_proto) #bc*s, c
+            print("reused_proto", reused_novel_proto.shape)
             
             reused_novel_proto = reused_novel_proto.reshape(bc, s, c).permute(0, 2, 1).unsqueeze(0) #1, bc, c, s
             feat = feat.permute(0, 2, 1).unsqueeze(1) #batch_size, 1, c, s
