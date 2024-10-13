@@ -25,6 +25,7 @@ def get_args_parser(subparsers):
     subparsers.add_argument('--backbone_feat_cls_weight', type=float, default=1.0)
     subparsers.add_argument('--map_metric_cls_weight', type=float, default=0.0)
     subparsers.add_argument('--primitive_recon_cls_weight', type=float, default=0.0)
+    subparsers.add_argument('--ft_prim_recon_tau', type=float, default=16.0)
     
     subparsers.add_argument('--map_pow', type=float, default=1.0)
     subparsers.add_argument('--bkb_feat_pow', type=float, default=1.0)

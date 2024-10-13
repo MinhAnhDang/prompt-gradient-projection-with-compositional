@@ -80,6 +80,7 @@ def main(args):
         use_prompt_mask=args.use_prompt_mask,
         map_pow = args.map_pow,
         aux_param = args.aux_param,
+        ft_prim_recon_tau = args.ft_prim_recon_tau,
     )
     original_model.to(device)
     model.to(device)  
