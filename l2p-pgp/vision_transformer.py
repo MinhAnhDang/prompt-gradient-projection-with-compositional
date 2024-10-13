@@ -586,7 +586,7 @@ class VisionTransformer(nn.Module):
             reused_novel_proto = reused_novel_proto.reshape(nc, s, c).permute(0, 2, 1) #nc, c, s   
             prim_recon_cls_logits = self.map_metric_logits(proto=reused_novel_proto, feat=feat, is_base=is_base)
         
-            return prim_recon_cls_logits
+            return prim_recon_cls_logits #nc, c, s
        
     def forward_features(self, x, task_id=-1, cls_features=None, train=False):
         x = self.patch_embed(x)
