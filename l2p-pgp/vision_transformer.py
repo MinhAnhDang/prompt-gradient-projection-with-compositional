@@ -526,7 +526,7 @@ class VisionTransformer(nn.Module):
         logits *= self.fc_map_temperature
         return logits
      
-    def map_metric_recon_logits(self, base_proto=None, feat=None, is_base=False, task_id=-1):
+    def map_metric_recon_logits(self, base_proto=None, feat=None, is_base=False, task_id=-1, device="cuda"):
         if base_proto is None:
             if is_base:
                 base_proto = self.proto[0]
@@ -545,7 +545,8 @@ class VisionTransformer(nn.Module):
             sims = sims.view(bc, s, bc, s)
             # print("Sims shape", sims.shape)
             
-            sims_mask = torch.eye(self.classes_per_task, dtype=torch.int64).unsqueeze(1).unsqueeze(-1).cuda()
+            sims_mask = torch.eye(self.classes_per_task, dtype=torch.int64).unsqueeze(1).unsqueeze(-1)
+            sims_mask = sims_mask.to(device)
             # print("Sims mask shape", sims_mask.shape)
             other_sims = sims - sims_mask*9999
             other_sims = other_sims.reshape(bc*s, bc*s)

@@ -64,11 +64,11 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
             if not args.distributed:
                 map_metric_logits = model.map_metric_logits(feat=feat_map)
                 if args.primitive_recon_cls_weight != 0:
-                    recon_map_logits = model.map_metric_recon_logits(feat=feat_map, is_base=is_base)
+                    recon_map_logits = model.map_metric_recon_logits(feat=feat_map, is_base=is_base,device=device)
             else:
                 map_metric_logits = model.modules.map_metric_logits()
                 if args.primitive_recon_cls_weight != 0:
-                    recon_map_logits = model.modules.map_metric_recon_logits(feat=feat_map, is_base=is_base)
+                    recon_map_logits = model.modules.map_metric_recon_logits(feat=feat_map, is_base=is_base,device=device)
         
         prompt_idx = output['prompt_idx'][0]
 
@@ -180,7 +180,7 @@ def evaluate(model: torch.nn.Module, original_model: torch.nn.Module, data_loade
             if model.composition:
                 map_metric_loss = criterion(map_metric_logits, target)
                 ind_acc1, ind_acc5 = accuracy(map_metric_logits, target, topk=(1, 5))
-                combine_acc1, combine_acc5 = accuracy(map)
+                combine_acc1, combine_acc5 = accuracy(map_metric_logits+logits, topk=(1,5))
                 
                 metric_logger.meters['Map_metric_loss'].update(map_metric_loss.item())
                 metric_logger.meters['Ind_acc@1'].update(ind_acc1.item(), n=input.shape[0])
