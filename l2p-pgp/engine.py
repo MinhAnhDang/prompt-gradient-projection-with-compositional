@@ -66,7 +66,7 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                 if args.primitive_recon_cls_weight != 0:
                     recon_map_logits = model.map_metric_recon_logits(feat=feat_map, is_base=is_base,device=device)
             else:
-                map_metric_logits = model.modules.map_metric_logits()
+                map_metric_logits = model.modules.map_metric_logits(feat=feat_map)
                 if args.primitive_recon_cls_weight != 0:
                     recon_map_logits = model.modules.map_metric_recon_logits(feat=feat_map, is_base=is_base,device=device)
         
