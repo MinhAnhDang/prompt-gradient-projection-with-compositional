@@ -549,6 +549,7 @@ class VisionTransformer(nn.Module):
             sims_mask = sims_mask.to(device)
             print("Sims mask shape", sims_mask.shape)
             other_sims = sims - sims_mask*9999
+            print("other_sims", other_sims.shape)
             other_sims = other_sims.reshape(bc*s, bc*s)
             #Soft reuse
             atten = torch.softmax(other_sims*self.aux_param, dim=-1)
