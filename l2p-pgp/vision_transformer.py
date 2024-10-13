@@ -535,7 +535,7 @@ class VisionTransformer(nn.Module):
         bc, c, s = base_proto.shape
         # print(bc, c, s)
         assert feat is not None, f"Feat is None"
-        print("is_base", is_base)
+        # print("is_base", is_base)
         if is_base:
             base_proto = base_proto - base_proto.mean(dim=1, keepdim=True) #bc, c, s
             feat = feat - feat.mean(dim=2, keepdim=True)        #batch_size, s, c
