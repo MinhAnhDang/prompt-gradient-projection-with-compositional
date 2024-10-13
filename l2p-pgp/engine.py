@@ -245,7 +245,7 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
     feature, feature_mat = None, None
     key_feature, key_feature_mat = None, None
 
-    for task_id in range(1, args.num_tasks,):
+    for task_id in range(args.num_tasks):
         if not args.no_pgp:
             model.eval()
             original_model.eval()
