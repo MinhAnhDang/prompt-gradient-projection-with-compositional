@@ -535,6 +535,7 @@ class VisionTransformer(nn.Module):
         bc, c, s = base_proto.shape
         # print(bc, c, s)
         assert feat is not None, f"Feat is None"
+        print("is_base", is_base)
         if is_base:
             base_proto = base_proto - base_proto.mean(dim=1, keepdim=True) #bc, c, s
             feat = feat - feat.mean(dim=2, keepdim=True)        #batch_size, s, c
@@ -570,8 +571,9 @@ class VisionTransformer(nn.Module):
             reused_novel_proto_norm = torch.norm(torch.matmul(reused_novel_proto.permute(0, 1, 3, 2), reused_novel_proto), dim=[2,3])
             print("reused norm", reused_novel_proto_norm.shape)
             prim_recon_cls_logits = cross_norm/(feat_map_norm*reused_novel_proto_norm +  0.000001)
-            print("final", prim_recon_cls_logits.shape)
+            
             prim_recon_cls_logits *= self.fc_map_temperature
+            print("final", prim_recon_cls_logits.shape)
             return prim_recon_cls_logits
         else:
             base_proto = base_proto.permute(0, 2, 1).reshape(bc*s, c) #bc*s, c
