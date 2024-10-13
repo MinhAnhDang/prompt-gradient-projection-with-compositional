@@ -86,10 +86,11 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                 loss = args.backbone_feat_cls_weight*loss + args.map_metric_cls_weight*map_metric_loss
                 # print("Base+Compare loss: ", loss)
                 if args.primitive_recon_cls_weight != 0:
+                    print("target shape", target.shape)
                     target = target[:, mask]
                     recon_loss = criterion(recon_map_logits, target)
                     loss += args.primitive_recon_cls_weight * recon_loss   
-                    # print("Total loss: ", loss)   
+                    print("Total loss: ", loss)   
                 
         if args.pull_constraint and 'reduce_sim' in output:
             loss = loss - args.pull_constraint_coeff * output['reduce_sim']
