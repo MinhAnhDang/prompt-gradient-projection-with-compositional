@@ -180,7 +180,7 @@ def evaluate(model: torch.nn.Module, original_model: torch.nn.Module, data_loade
             if model.composition:
                 map_metric_loss = criterion(map_metric_logits, target)
                 ind_acc1, ind_acc5 = accuracy(map_metric_logits, target, topk=(1, 5))
-                combine_acc1, combine_acc5 = accuracy(map_metric_logits+logits, topk=(1,5))
+                combine_acc1, combine_acc5 = accuracy(map_metric_logits+logits, target, topk=(1,5))
                 
                 metric_logger.meters['Map_metric_loss'].update(map_metric_loss.item())
                 metric_logger.meters['Ind_acc@1'].update(ind_acc1.item(), n=input.shape[0])
