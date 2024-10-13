@@ -168,7 +168,7 @@ def evaluate(model: torch.nn.Module, original_model: torch.nn.Module, data_loade
                 logits = logits + logits_mask
                 if model.composition:
                     map_metric_logits = map_metric_logits + logits_mask
-                    combine_logits = (map_metric_logits + logits)/2
+                    
             loss = criterion(logits, target)
             
             acc1, acc5 = accuracy(logits, target, topk=(1, 5))
@@ -179,6 +179,7 @@ def evaluate(model: torch.nn.Module, original_model: torch.nn.Module, data_loade
             metric_logger.meters['Acc@5'].update(acc5.item(), n=input.shape[0])
             if model.composition:
                 map_metric_loss = criterion(map_metric_logits, target)
+                combine_logits = (map_metric_logits + logits)/2
                 ind_acc1, ind_acc5 = accuracy(map_metric_logits, target, topk=(1, 5))
                 combine_acc1, combine_acc5 = accuracy(combine_logits, target, topk=(1,5))
                 
