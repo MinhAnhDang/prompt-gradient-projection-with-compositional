@@ -89,7 +89,8 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                     # print(map_metric_logits[:, mask])
                     map_metric_logits[:, mask] = recon_map_logits
                     # print(map_metric_logits[:, mask])
-                    recon_loss = criterion(recon_map_logits, target)
+                    # print("recon shape", recon_map_logits.shape)
+                    recon_loss = criterion(map_metric_logits, target)
                     loss += args.primitive_recon_cls_weight * recon_loss   
                     # print("Total loss: ", loss)   
                 
@@ -244,7 +245,7 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
     feature, feature_mat = None, None
     key_feature, key_feature_mat = None, None
 
-    for task_id in range(args.num_tasks):
+    for task_id in range(1, args.num_tasks,):
         if not args.no_pgp:
             model.eval()
             original_model.eval()
