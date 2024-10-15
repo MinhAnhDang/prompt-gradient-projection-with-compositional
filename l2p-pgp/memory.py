@@ -37,7 +37,7 @@ def get_rep(model, original_model, mem_example, task_id):
 
 
 def update_memory(representation, threshold, feature=None):
-    representation = np.matmul(representation, representation.T)
+    representation = np.matmul(representation.T, representation)
     if feature is None:
         U, S, Vh = np.linalg.svd(representation, full_matrices=False)
         sval_total = (S ** 2).sum()
@@ -48,7 +48,7 @@ def update_memory(representation, threshold, feature=None):
         U1, S1, Vh1 = np.linalg.svd(representation, full_matrices=False)
         sval_total = (S1 ** 2).sum()
         # Projected Representation
-        act_hat = representation - np.dot(np.dot(feature, feature.transpose()), representation)
+        act_hat = representation - np.dot(representation, np.dot(feature, feature.transpose()))
         U, S, Vh = np.linalg.svd(act_hat, full_matrices=False)
         # criteria
         sval_hat = (S ** 2).sum()

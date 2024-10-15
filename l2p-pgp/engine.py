@@ -74,7 +74,7 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
 
         # here is the trick to mask out classes of non-current tasks
         if args.train_mask and class_mask is not None:
-            mask = class_mask[task_id]
+            mask = class_mask[task_id] 
             not_mask = np.setdiff1d(np.arange(args.nb_classes), mask)
             not_mask = torch.tensor(not_mask, dtype=torch.int64).to(device)
             logits = logits.index_fill(dim=1, index=not_mask, value=float('-inf'))
@@ -246,49 +246,16 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
     key_feature, key_feature_mat = None, None
 
     for task_id in range(args.num_tasks):
-        if not args.no_pgp:
-            model.eval()
-            original_model.eval()
-            mem_example = memory.get_representation_matrix(data_loader[task_id]['mem'], device)
-            rep, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
+        if not args.no_pgp and task_id != 0:
+            print("prompt feature shape", feature.shape)
+            Uf = torch.Tensor(np.dot(feature, feature.transpose())).to(device)
+            print('Prompt Projection Matrix Shape: {}'.format(Uf.shape))
+            feature_mat = Uf
 
-            rep = torch.cat(rep)
-            rep = rep.detach().cpu().numpy()
-            pca = PCA(n_components=9)
-            pca = pca.fit(rep)
-            rep = pca.transform(rep)
-
-            if task_id != 0:
-                for k, (m, params) in enumerate(model.named_parameters()):
-                    if m == "prompt.prompt":
-                        p_ = params.data
-                        p_ = p_.view(-1, 768).detach().cpu().numpy().transpose(1, 0)
-
-                pca = PCA(n_components=9)
-                pca = pca.fit(p_)
-                p = pca.transform(p_)
-
-                rep = rep + p
-
-            rep_key = torch.cat(rep_key)
-            rep_key = rep_key.detach().cpu().numpy()
-            pca = PCA(n_components=5)
-            pca = pca.fit(rep_key)
-            rep_key = pca.transform(rep_key)
-
-            if task_id != 0:
-                print("prompt feature shape", feature.shape)
-                Uf = torch.Tensor(np.dot(feature, feature.transpose())).to(device)
-                print('Prompt Projection Matrix Shape: {}'.format(Uf.shape))
-                feature_mat = Uf
-
-                print("key feature shape", key_feature.shape)
-                Uf = torch.Tensor(np.dot(key_feature, key_feature.transpose())).to(device)
-                print('Key Projection Matrix Shape: {}'.format(Uf.shape))
-                key_feature_mat = Uf
-
-            feature = memory.update_memory(rep, 0.50, feature)
-            key_feature = memory.update_memory(rep_key, 0.97, key_feature)
+            print("key feature shape", key_feature.shape)
+            Uf = torch.Tensor(np.dot(key_feature, key_feature.transpose())).to(device)
+            print('Key Projection Matrix Shape: {}'.format(Uf.shape))
+            key_feature_mat = Uf
 
         # Transfer previous learned prompt params to the new prompt
         if args.prompt_pool and args.shared_prompt_pool:
@@ -335,11 +302,11 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
                         optimizer.param_groups[0]['params'] = model.parameters()
     
                     
-        print("----------Training Paramenters----------")
+        print("----------Trainable Parameters----------")
         for name, params in model.named_parameters():
-            if 'proto' in name and int(name[-1]) > task_id:
+            if 'proto' in name and int(name[-1]) == task_id:
                 params.requires_grad = False
-            elif 'proto' in name and int(name[-1]) <= task_id: 
+            elif 'proto' in name and int(name[-1]) != task_id: 
                 params.requires_grad = True
             if params.requires_grad:
                 print(name)    
@@ -355,6 +322,7 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             
         print("----------------Training----------------")            
         
+        # Training
         for epoch in range(args.epochs):
             train_stats = train_one_epoch(model=model, original_model=original_model, criterion=criterion,
                                         data_loader=data_loader[task_id]['train'], optimizer=optimizer, device=device,
@@ -363,9 +331,50 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
 
             if lr_scheduler:
                 lr_scheduler.step(epoch)
-
+                
+        # Evaluating
         test_stats = evaluate_till_now(model=model, original_model=original_model, data_loader=data_loader, device=device, 
                                        task_id=task_id, class_mask=class_mask, acc_matrix=acc_matrix, args=args)
+        
+        #Update feature matrix, key_feature matrix
+        if not args.no_pgp:
+            model.eval()
+            original_model.eval()
+            mem_example = memory.get_representation_matrix(data_loader[task_id]['mem'], device)
+            rep, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
+            # rep = model.proto[task_id].permute(0,2,1).reshape(-1, 768).detach().cpu().numpy()
+            # _, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
+            
+            # rep = torch.cat(rep)
+            # rep = rep.detach().cpu().numpy()
+            # pca = PCA(n_components=9)
+            # pca = pca.fit(rep)
+            # rep = pca.transform(rep)
+
+            if task_id != 0:
+                for k, (m, params) in enumerate(model.named_parameters()):
+                    if m == "prompt.prompt":
+                        p_ = params.data
+                        p_ = p_.view(-1, 768).detach().cpu().numpy()#.transpose(1, 0)
+
+                # pca = PCA(n_components=9)
+                # pca = pca.fit(p_)
+                # p = pca.transform(p_)
+                p = p_
+
+                # rep = rep + p
+                rep = np.concatenate((rep, p), axis=0) #Replace element-wise summation with concatenation
+               
+            rep_key = torch.cat(rep_key)
+            rep_key = rep_key.detach().cpu().numpy()
+            # pca = PCA(n_components=5)
+            # pca = pca.fit(rep_key)
+            # rep_key = pca.transform(rep_key)
+
+            feature = memory.update_memory(rep, 0.50, feature)
+            key_feature = memory.update_memory(rep_key, 0.97, key_feature)
+
+        
         if args.output_dir and utils.is_main_process():
             Path(os.path.join(args.output_dir, 'checkpoint')).mkdir(parents=True, exist_ok=True)
             
