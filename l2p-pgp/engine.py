@@ -351,19 +351,19 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             # pca = pca.fit(rep)
             # rep = pca.transform(rep)
 
-            if task_id != 0:
-                for k, (m, params) in enumerate(model.named_parameters()):
-                    if m == "prompt.prompt":
-                        p_ = params.data
-                        p_ = p_.view(-1, 768).detach().cpu().numpy()#.transpose(1, 0)
+            # if task_id != 0:
+            for k, (m, params) in enumerate(model.named_parameters()):
+                if m == "prompt.prompt":
+                    p_ = params.data
+                    p_ = p_.view(-1, 768).detach().cpu().numpy()#.transpose(1, 0)
 
                 # pca = PCA(n_components=9)
                 # pca = pca.fit(p_)
                 # p = pca.transform(p_)
-                p = p_
+            p = p_
 
                 # rep = rep + p
-                rep = np.concatenate((rep, p), axis=0) #Replace element-wise summation with concatenation
+            rep = np.concatenate((rep, p), axis=0) #Replace element-wise summation with concatenation
                
             rep_key = torch.cat(rep_key)
             rep_key = rep_key.detach().cpu().numpy()
