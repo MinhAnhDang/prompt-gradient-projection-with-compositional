@@ -213,13 +213,19 @@ def evaluate_till_now(model: torch.nn.Module, original_model: torch.nn.Module, d
     for i in range(task_id+1):
         test_stats = evaluate(model=model, original_model=original_model, data_loader=data_loader[i]['val'], 
                               device=device, task_id=i, class_mask=class_mask, args=args)
+        if model.composition:
+            stat_matrix[0, i] = test_stats['Combine_acc@1']
+            stat_matrix[1, i] = test_stats['Combine_acc@5']
+            stat_matrix[2, i] = test_stats['Loss'] + test_stats['Map_metric_loss']
 
-        stat_matrix[0, i] = test_stats['Combine_acc@1']
-        stat_matrix[1, i] = test_stats['Combine_acc@5']
-        stat_matrix[2, i] = test_stats['Loss']+test_stats['Map_metric_loss']
+            acc_matrix[i, task_id] = test_stats['Combine_acc@1']
+        else:
+            stat_matrix[0, i] = test_stats['Acc@1']
+            stat_matrix[1, i] = test_stats['Acc@5']
+            stat_matrix[2, i] = test_stats['Loss']
 
-        acc_matrix[i, task_id] = test_stats['Combine_acc@1']
-    
+            acc_matrix[i, task_id] = test_stats['Acc@1']
+        
     avg_stat = np.divide(np.sum(stat_matrix, axis=1), task_id+1)
 
     diagonal = np.diag(acc_matrix)
