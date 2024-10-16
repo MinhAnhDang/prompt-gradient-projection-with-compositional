@@ -379,7 +379,7 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             pca = pca.fit(rep_key)
             rep_key = pca.transform(rep_key)
 
-            feature = memory.update_memory(rep, 0.5, feature)
+            feature = memory.update_memory(rep, 0.8, feature)
             key_feature = memory.update_memory(rep_key, 0.97, key_feature)
 
         

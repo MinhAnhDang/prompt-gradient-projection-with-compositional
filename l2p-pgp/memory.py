@@ -40,19 +40,19 @@ def update_memory(representation, threshold, feature=None):
     representation = np.matmul(representation, representation.T)
     if feature is None:
         U, S, Vh = np.linalg.svd(representation, full_matrices=False)
-        sval_total = (S**2).sum()
-        sval_ratio = (S**2) / sval_total
+        sval_total = S.sum()
+        sval_ratio = S / sval_total
         r = np.sum(np.cumsum(sval_ratio) < threshold)
         feature = U[:, 0:r]
     else:
         U1, S1, Vh1 = np.linalg.svd(representation, full_matrices=False)
-        sval_total = (S1 ** 2).sum()
+        sval_total = S1.sum()
         # Projected Representation
         act_hat = representation - np.dot(representation, np.dot(feature, feature.transpose()))
         U, S, Vh = np.linalg.svd(act_hat, full_matrices=False)
         # criteria
-        sval_hat = (S**2).sum()
-        sval_ratio = (S**2) / sval_total
+        sval_hat = S.sum()
+        sval_ratio = S / sval_total
         accumulated_sval = (sval_total - sval_hat) / sval_total
         r = 0
         for ii in range(sval_ratio.shape[0]):
