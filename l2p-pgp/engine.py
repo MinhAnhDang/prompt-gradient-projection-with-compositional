@@ -347,30 +347,31 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             model.eval()
             original_model.eval()
             mem_example = memory.get_representation_matrix(data_loader[task_id]['mem'], device)
-            rep, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
-            # _, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
+            # rep, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
+            _, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
             
-            rep = torch.cat(rep)
-            rep = rep.detach().cpu().numpy()
+            # rep = torch.cat(rep)
+            # rep = rep.detach().cpu().numpy()
+            # 
             # pca = PCA(n_components=9)
             # pca = pca.fit(rep)
             # rep = pca.transform(rep)
             
-            # rep = model.proto[task_id].permute(0,2,1).reshape(-1, 768).detach().cpu().numpy()
-            
+            rep = model.proto[task_id].permute(0,2,1).reshape(-1, 768).detach().cpu().numpy()
+            # print(rep.shape)
             # if task_id != 0:
             for k, (m, params) in enumerate(model.named_parameters()):
                 if m == "prompt.prompt":
                     p_ = params.data
-                    p_ = p_.view(-1, 768).detach().cpu().numpy().transpose(1, 0)
+                    p_ = p_.view(-1, 768).detach().cpu().numpy()#.transpose(1, 0)
 
                 # pca = PCA(n_components=9)
                 # pca = pca.fit(p_)
                 # p = pca.transform(p_)
             p = p_
-
-            rep = rep + p
-            # rep = np.concatenate((rep, p), axis=0) #Replace element-wise summation with concatenation
+            # print(p.shape)
+            # rep = rep + p
+            rep = np.concatenate((rep, p), axis=0) #Replace element-wise summation with concatenation
                
             rep_key = torch.cat(rep_key)
             rep_key = rep_key.detach().cpu().numpy()
