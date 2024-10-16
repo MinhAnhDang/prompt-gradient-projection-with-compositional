@@ -122,9 +122,9 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                         params.grad.data[prompt_idx], key_feature_mat)
                 if "proto" in m and int(m[-1]) < task_id:
                     # print("Grad before project", params.grad.data)
-                    params.grad.data = params.grad.data - torch.mm(params.grad.data, feature_mat)
+                    n_classes, n_embed, n_prompt = params.grad.data.shape
+                    params.grad.data = params.grad.data - torch.mm(params.grad.data.permute(0,2,1).reshape(-1, 768), feature_mat).reshape(n_classes, n_prompt, n_embed).permute(0,2,1)
                     # print("Grad after project", params.grad.data)
-
         optimizer.step()
 
         torch.cuda.synchronize()
@@ -318,10 +318,10 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
                     
         print("----------Trainable Parameters----------")
         for name, params in model.named_parameters():
-            # if 'proto' in name and int(name[-1]) == task_id:
-            #     params.requires_grad = True
-            # elif 'proto' in name and int(name[-1]) != task_id: 
-            #     params.requires_grad = False
+            if 'proto' in name and int(name[-1]) == task_id:
+                params.requires_grad = True
+            elif 'proto' in name and int(name[-1]) != task_id: 
+                params.requires_grad = False
             if params.requires_grad:
                 print(name)    
         print("----------------------------------------")       
