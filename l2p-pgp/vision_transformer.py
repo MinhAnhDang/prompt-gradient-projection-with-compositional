@@ -530,7 +530,7 @@ class VisionTransformer(nn.Module):
     def map_metric_recon_logits(self, base_proto=None, feat=None, is_base=False, task_id=-1, device="cuda"):
         if base_proto is None:
             if is_base:
-                base_proto = self.proto[0].detach()
+                base_proto = self.proto[0]
             else:
                 base_proto = torch.cat([p.detach() for p in self.proto[:task_id]])
         bc, c, s = base_proto.shape
