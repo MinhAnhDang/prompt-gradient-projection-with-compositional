@@ -75,13 +75,17 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
         # here is the trick to mask out classes of non-current tasks
         if args.train_mask and class_mask is not None:
             mask = class_mask[task_id] 
+            # print("Class mask", mask)
             not_mask = np.setdiff1d(np.arange(args.nb_classes), mask)
             not_mask = torch.tensor(not_mask, dtype=torch.int64).to(device)
             logits = logits.index_fill(dim=1, index=not_mask, value=float('-inf'))
+            # print("Logits shape", logits.shape)
             loss = criterion(logits, target) # base criterion (CrossEntropyLoss)
             # print("Base loss: ", loss)
             if model.composition:
-                map_metric_logits = map_metric_logits.index_fill(dim=1, index=not_mask, value=float('-inf'))                
+                map_metric_logits = map_metric_logits.index_fill(dim=1, index=not_mask, value=float('-inf')) 
+                # print("Map logits shape: ", map_metric_logits.shape)
+                # print("Map logits: ", map_metric_logits)               
                 map_metric_loss = criterion(map_metric_logits, target)
                 loss = args.backbone_feat_cls_weight*loss + args.map_metric_cls_weight*map_metric_loss
                 # print("Base+Compare loss: ", loss)
@@ -310,10 +314,10 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
                     
         print("----------Trainable Parameters----------")
         for name, params in model.named_parameters():
-            if 'proto' in name and int(name[-1]) == task_id:
-                params.requires_grad = True
-            elif 'proto' in name and int(name[-1]) != task_id: 
-                params.requires_grad = False
+            # if 'proto' in name and int(name[-1]) == task_id:
+            #     params.requires_grad = True
+            # elif 'proto' in name and int(name[-1]) != task_id: 
+            #     params.requires_grad = False
             if params.requires_grad:
                 print(name)    
         print("----------------------------------------")       
@@ -379,7 +383,7 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             # pca = pca.fit(rep_key)
             # rep_key = pca.transform(rep_key)
 
-            feature = memory.update_memory(rep, 0.50, feature)
+            feature = memory.update_memory(rep, 0.7, feature)
             key_feature = memory.update_memory(rep_key, 0.97, key_feature)
 
         
