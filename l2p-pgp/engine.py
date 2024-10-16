@@ -64,11 +64,11 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
             if not args.distributed:
                 map_metric_logits = model.map_metric_logits(feat=feat_map)
                 if args.primitive_recon_cls_weight != 0:
-                    recon_map_logits = model.map_metric_recon_logits(feat=feat_map, is_base=is_base,device=device)
+                    recon_map_logits = model.map_metric_recon_logits(feat=feat_map, is_base=is_base, task_id=task_id, device=device)
             else:
                 map_metric_logits = model.modules.map_metric_logits(feat=feat_map)
                 if args.primitive_recon_cls_weight != 0:
-                    recon_map_logits = model.modules.map_metric_recon_logits(feat=feat_map, is_base=is_base,device=device)
+                    recon_map_logits = model.modules.map_metric_recon_logits(feat=feat_map, is_base=is_base, task_id=task_id, device=device)
         
         prompt_idx = output['prompt_idx'][0]
 
@@ -92,7 +92,7 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                 if args.primitive_recon_cls_weight != 0:
                     # print(map_metric_logits[:, mask])
                     map_metric_logits[:, mask] = recon_map_logits
-                    # print(map_metric_logits[:, mask])
+                    # print("Reconstruct logits:",map_metric_logits)
                     # print("recon shape", recon_map_logits.shape)
                     recon_loss = criterion(map_metric_logits, target)
                     loss += args.primitive_recon_cls_weight * recon_loss   
@@ -120,11 +120,7 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                 if m == "prompt.prompt_key":
                     params.grad.data[prompt_idx] = params.grad.data[prompt_idx] - torch.mm(
                         params.grad.data[prompt_idx], key_feature_mat)
-                if "proto" in m and int(m[-1]) < task_id:
-                    # print("Grad before project", params.grad.data)
-                    n_classes, n_embed, n_prompt = params.grad.data.shape
-                    params.grad.data = params.grad.data - torch.mm(params.grad.data.permute(0,2,1).reshape(-1, 768), feature_mat).reshape(n_classes, n_prompt, n_embed).permute(0,2,1)
-                    # print("Grad after project", params.grad.data)
+               
         optimizer.step()
 
         torch.cuda.synchronize()
@@ -179,7 +175,8 @@ def evaluate(model: torch.nn.Module, original_model: torch.nn.Module, data_loade
                 logits = logits + logits_mask
                 if model.composition:
                     map_metric_logits = map_metric_logits + logits_mask
-                    
+            # print("target in evaluate: ", target)
+            # print("logits in evaluate: ", logits)        
             loss = criterion(logits, target)
             
             acc1, acc5 = accuracy(logits, target, topk=(1, 5))
@@ -318,10 +315,6 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
                     
         print("----------Trainable Parameters----------")
         for name, params in model.named_parameters():
-            if 'proto' in name and int(name[-1]) == task_id:
-                params.requires_grad = True
-            elif 'proto' in name and int(name[-1]) != task_id: 
-                params.requires_grad = False
             if params.requires_grad:
                 print(name)    
         print("----------------------------------------")       
@@ -355,39 +348,38 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             model.eval()
             original_model.eval()
             mem_example = memory.get_representation_matrix(data_loader[task_id]['mem'], device)
-            # rep, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
-            _, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
+            rep, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
+            # _, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
             
-            # rep = torch.cat(rep)
-            # rep = rep.detach().cpu().numpy()
-            # 
-            # pca = PCA(n_components=9)
-            # pca = pca.fit(rep)
-            # rep = pca.transform(rep)
+            rep = torch.cat(rep)
+            rep = rep.detach().cpu().numpy()
             
-            rep = model.proto[task_id].permute(0,2,1).reshape(-1, 768).detach().cpu().numpy()
+            pca = PCA(n_components=9)
+            pca = pca.fit(rep)
+            rep = pca.transform(rep)
+            
+            # rep = model.proto[task_id].permute(0,2,1).reshape(-1, 768).detach().cpu().numpy()
             # print(rep.shape)
-            # if task_id != 0:
-            for k, (m, params) in enumerate(model.named_parameters()):
-                if m == "prompt.prompt":
-                    p_ = params.data
-                    p_ = p_.view(-1, 768).detach().cpu().numpy()#.transpose(1, 0)
+            if task_id != 0:
+                for k, (m, params) in enumerate(model.named_parameters()):
+                    if m == "prompt.prompt":
+                        p_ = params.data
+                        p_ = p_.view(-1, 768).detach().cpu().numpy().transpose(1, 0)
 
-                # pca = PCA(n_components=9)
-                # pca = pca.fit(p_)
-                # p = pca.transform(p_)
-            p = p_
-            # print(p.shape)
-            # rep = rep + p
-            rep = np.concatenate((rep, p), axis=0) #Replace element-wise summation with concatenation
+                pca = PCA(n_components=9)
+                pca = pca.fit(p_)
+                p = pca.transform(p_)
+            # p = p_
+                rep = rep + p
+            # rep = np.concatenate((rep, p), axis=0) #Replace element-wise summation with concatenation
                
             rep_key = torch.cat(rep_key)
             rep_key = rep_key.detach().cpu().numpy()
-            # pca = PCA(n_components=5)
-            # pca = pca.fit(rep_key)
-            # rep_key = pca.transform(rep_key)
+            pca = PCA(n_components=5)
+            pca = pca.fit(rep_key)
+            rep_key = pca.transform(rep_key)
 
-            feature = memory.update_memory(rep, 0.7, feature)
+            feature = memory.update_memory(rep, 0.5, feature)
             key_feature = memory.update_memory(rep_key, 0.97, key_feature)
 
         

@@ -530,9 +530,9 @@ class VisionTransformer(nn.Module):
     def map_metric_recon_logits(self, base_proto=None, feat=None, is_base=False, task_id=-1, device="cuda"):
         if base_proto is None:
             if is_base:
-                base_proto = self.proto[0]
+                base_proto = self.proto[0].detach()
             else:
-                base_proto = torch.cat([p for p in self.proto[:task_id]])
+                base_proto = torch.cat([p.detach() for p in self.proto[:task_id]])
         bc, c, s = base_proto.shape
         # print(bc, c, s)
         assert feat is not None, f"Feat is None"
@@ -578,7 +578,7 @@ class VisionTransformer(nn.Module):
             return prim_recon_cls_logits
         else:
             base_proto = base_proto.permute(0, 2, 1).reshape(bc*s, c) #bc*s, c
-            novel_proto = self.proto[task_id+1] # [novel_class, c, s]
+            novel_proto = self.proto[task_id] # [novel_class, c, s]
             nc = novel_proto.shape[0]
             novel_proto = novel_proto.permute(0,2,1).reshape(nc*s, c) # nc*s, c
             sims = -torch.cdist(novel_proto, base_proto, p=2)**2 #nc*s, bc*s
