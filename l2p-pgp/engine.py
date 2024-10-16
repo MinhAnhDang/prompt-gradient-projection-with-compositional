@@ -311,9 +311,9 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
         print("----------Trainable Parameters----------")
         for name, params in model.named_parameters():
             if 'proto' in name and int(name[-1]) == task_id:
-                params.requires_grad = False
-            elif 'proto' in name and int(name[-1]) != task_id: 
                 params.requires_grad = True
+            elif 'proto' in name and int(name[-1]) != task_id: 
+                params.requires_grad = False
             if params.requires_grad:
                 print(name)    
         print("----------------------------------------")       
