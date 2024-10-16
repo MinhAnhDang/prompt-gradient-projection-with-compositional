@@ -120,6 +120,10 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
                 if m == "prompt.prompt_key":
                     params.grad.data[prompt_idx] = params.grad.data[prompt_idx] - torch.mm(
                         params.grad.data[prompt_idx], key_feature_mat)
+                if "proto" in m and int(m[-1]) < task_id:
+                    # print("Grad before project", params.grad.data)
+                    params.grad.data = params.grad.data - torch.mm(params.grad.data, feature_mat)
+                    # print("Grad after project", params.grad.data)
 
         optimizer.step()
 
