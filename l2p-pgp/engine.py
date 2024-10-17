@@ -339,8 +339,10 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             # optimizer = create_optimizer(args, model)
             proto = [p for name, p in model.named_parameters() if 'proto' in name]
             others = [p for name, p in model.named_parameters() if 'proto' not in name]
-            parameters = [{'params': proto, 'lr': 0.0005},
-                          {'params': others}]
+
+            parameters = [{'params': others},
+                     {'params': proto, 'lr': 0.0005},
+                    ]
             # optimizer = create_optimizer(args, model_without_ddp)
             optimizer = create_optimizer(args, parameters)
             

@@ -134,7 +134,7 @@ def main(args):
         proto = [p for name, p in model_without_ddp.named_parameters() if 'proto' in name]
         others = [p for name, p in model_without_ddp.named_parameters() if 'proto' not in name]
         parameters = [{'params': others},
-                    {'params': proto, 'lr': 0.0005},
+                     {'params': proto, 'lr': 0.0005},
                     ]
         optimizer = create_optimizer(args, parameters)
     else:
