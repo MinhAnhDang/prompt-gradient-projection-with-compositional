@@ -44,6 +44,8 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('Lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('Loss', utils.SmoothedValue(window_size=1, fmt='{value:.4f}'))
+    if model.composition:
+        metric_logger.add_meter('Comp_Lr', utils.SmoothedValue(window_size=1, fmt='{value:.4f}'))
     header = f'Train: Epoch[{epoch+1:{int(math.log10(args.epochs))+1}}/{args.epochs}]'
     
     for input, target in metric_logger.log_every(data_loader, args.print_freq, header):
@@ -131,6 +133,7 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
         metric_logger.meters['Acc@1'].update(acc1.item(), n=input.shape[0])
         metric_logger.meters['Acc@5'].update(acc5.item(), n=input.shape[0])
         if model.composition:
+            metric_logger.update(Comp_Lr=optimizer.param_groups[1]["lr"])
             metric_logger.meters['Ind_Acc@1'].update(ind_acc1.item(), n=input.shape[0])
             metric_logger.meters['Ind_Acc@5'].update(ind_acc5.item(), n=input.shape[0])
         
@@ -331,8 +334,15 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
         # Create new optimizer for each task to clear optimizer status
         if task_id > 0 and args.reinit_optimizer:
             # Double learning rate after each task
-            args.lr = args.lr * 2 if args.lr < 0.1 else args.lr
-            optimizer = create_optimizer(args, model)
+            # args.lr = args.lr * 0.5 if args.lr < 0.1 else args.lr
+            
+            # optimizer = create_optimizer(args, model)
+            proto = [p for name, p in model.named_parameters() if 'proto' in name]
+            others = [p for name, p in model.named_parameters() if 'proto' not in name]
+            parameters = [{'params': proto, 'lr': 0.0005},
+                          {'params': others}]
+            # optimizer = create_optimizer(args, model_without_ddp)
+            optimizer = create_optimizer(args, parameters)
             
         print("----------------Training----------------")            
         

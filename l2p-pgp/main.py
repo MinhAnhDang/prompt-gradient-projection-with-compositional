@@ -128,7 +128,18 @@ def main(args):
         global_batch_size = args.batch_size * args.world_size
     args.lr = args.lr * global_batch_size / 256.0
 
-    optimizer = create_optimizer(args, model_without_ddp)
+    
+    # Distinct learning rate for proto and others parameters
+    if args.composition:
+        proto = [p for name, p in model_without_ddp.named_parameters() if 'proto' in name]
+        others = [p for name, p in model_without_ddp.named_parameters() if 'proto' not in name]
+        parameters = [{'params': others},
+                    {'params': proto, 'lr': 0.0005},
+                    ]
+        optimizer = create_optimizer(args, parameters)
+    else:
+        optimizer = create_optimizer(args, model_without_ddp)
+    
 
     if args.sched != 'constant':
         lr_scheduler, _ = create_scheduler(args, optimizer)
