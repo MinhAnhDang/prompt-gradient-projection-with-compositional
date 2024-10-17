@@ -331,12 +331,15 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
         # Create new optimizer for each task to clear optimizer status
         if task_id > 0 and args.reinit_optimizer:
             # Double learning rate after each task
-            args.lr = args.lr * 2 if args.lr*2 < 1 else 1 
+            args.lr = args.lr * 2 if args.lr < 0.1 else args.lr
             optimizer = create_optimizer(args, model)
             
         print("----------------Training----------------")            
         
         # Training
+        if task_id != 0:        
+            args.epochs = 15
+            
         for epoch in range(args.epochs):
             train_stats = train_one_epoch(model=model, original_model=original_model, criterion=criterion,
                                         data_loader=data_loader[task_id]['train'], optimizer=optimizer, device=device,
@@ -386,7 +389,7 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             pca = pca.fit(rep_key)
             rep_key = pca.transform(rep_key)
 
-            feature = memory.update_memory(rep, 0.7, feature)
+            feature = memory.update_memory(rep, 0.5, feature)
             key_feature = memory.update_memory(rep_key, 0.97, key_feature)
 
         
@@ -412,5 +415,4 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
         if args.output_dir and utils.is_main_process():
             with open(os.path.join(args.output_dir, '{}_stats.txt'.format(datetime.datetime.now().strftime('log_%Y_%m_%d_%H_%M'))), 'a') as f:
                 f.write(json.dumps(log_stats) + '\n')
-                
-        args.epochs = args.epochs * 2
+
