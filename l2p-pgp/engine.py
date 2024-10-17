@@ -102,6 +102,8 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
             loss = loss - args.pull_constraint_coeff * output['reduce_sim']
 
         acc1, acc5 = accuracy(logits, target, topk=(1, 5))
+        if model.composition:
+            ind_acc1, ind_acc5 = accuracy(map_metric_logits, target, topk=(1,5))
 
         if not math.isfinite(loss.item()):
             print("Loss is {}, stopping training".format(loss.item()))
@@ -128,6 +130,9 @@ def train_one_epoch(model: torch.nn.Module, original_model: torch.nn.Module,
         metric_logger.update(Lr=optimizer.param_groups[0]["lr"])
         metric_logger.meters['Acc@1'].update(acc1.item(), n=input.shape[0])
         metric_logger.meters['Acc@5'].update(acc5.item(), n=input.shape[0])
+        if model.composition:
+            metric_logger.meters['Ind_Acc@1'].update(ind_acc1.item(), n=input.shape[0])
+            metric_logger.meters['Ind_Acc@5'].update(ind_acc5.item(), n=input.shape[0])
         
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -325,6 +330,8 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
         print('Total number of params:', n_parameters)                 
         # Create new optimizer for each task to clear optimizer status
         if task_id > 0 and args.reinit_optimizer:
+            # Double learning rate after each task
+            args.lr = args.lr * 2 if args.lr*2 < 1 else 1 
             optimizer = create_optimizer(args, model)
             
         print("----------------Training----------------")            
@@ -379,7 +386,7 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             pca = pca.fit(rep_key)
             rep_key = pca.transform(rep_key)
 
-            feature = memory.update_memory(rep, 0.8, feature)
+            feature = memory.update_memory(rep, 0.7, feature)
             key_feature = memory.update_memory(rep_key, 0.97, key_feature)
 
         
