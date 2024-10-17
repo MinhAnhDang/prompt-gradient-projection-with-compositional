@@ -413,4 +413,4 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             with open(os.path.join(args.output_dir, '{}_stats.txt'.format(datetime.datetime.now().strftime('log_%Y_%m_%d_%H_%M'))), 'a') as f:
                 f.write(json.dumps(log_stats) + '\n')
                 
-        args.epoch = args.epoch * 2
+        args.epochs = args.epochs * 2
