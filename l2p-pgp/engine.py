@@ -333,15 +333,15 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
         print('Total number of params:', n_parameters)                 
         # Create new optimizer for each task to clear optimizer status
         if task_id > 0 and args.reinit_optimizer:
-            # Double learning rate after each task
-            # args.lr = args.lr * 0.5 if args.lr < 0.1 else args.lr
+            # Double compositional learning rate after each task
+            args.lr = args.lr * 0.5 if args.lr < 0.1 else args.lr
             
             # optimizer = create_optimizer(args, model)
             proto = [p for name, p in model.named_parameters() if 'proto' in name]
             others = [p for name, p in model.named_parameters() if 'proto' not in name]
 
             parameters = [{'params': others},
-                     {'params': proto, 'lr': 0.0005},
+                     {'params': proto, 'lr': args.comp_lr},
                     ]
             # optimizer = create_optimizer(args, model_without_ddp)
             optimizer = create_optimizer(args, parameters)

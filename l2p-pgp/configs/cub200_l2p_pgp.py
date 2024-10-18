@@ -7,8 +7,7 @@ def get_args_parser(subparsers):
     subparsers.add_argument('--no_pgp', action="store_true", help='Not activate prompt gradient projection')
 
     # Model parameters
-    subparsers.add_argument('--model', default='vit_base_patch16_224', type=str, metavar='MODEL',
-                            help='Name of model to train')
+    subparsers.add_argument('--model', default='vit_base_patch16_224', type=str, metavar='MODEL',help='Name of model to train')
     subparsers.add_argument('--input-size', default=224, type=int, help='images input size')
     subparsers.add_argument('--pretrained', default=True, help='Load pretrained model or not')
     subparsers.add_argument('--drop', type=float, default=0.0, metavar='PCT', help='Dropout rate (default: 0.)')
@@ -16,16 +15,25 @@ def get_args_parser(subparsers):
 
     # Optimizer parameters
     subparsers.add_argument('--opt', default='adam', type=str, metavar='OPTIMIZER', help='Optimizer (default: "adam"')
-    subparsers.add_argument('--opt-eps', default=1e-8, type=float, metavar='EPSILON',
-                            help='Optimizer Epsilon (default: 1e-8)')
-    subparsers.add_argument('--opt-betas', default=(0.9, 0.999), type=float, nargs='+', metavar='BETA',
-                            help='Optimizer Betas (default: (0.9, 0.999), use opt default)')
-    subparsers.add_argument('--clip-grad', type=float, default=1.0, metavar='NORM',
-                            help='Clip gradient norm (default: None, no clipping)')
+    subparsers.add_argument('--opt-eps', default=1e-8, type=float, metavar='EPSILON', help='Optimizer Epsilon (default: 1e-8)')
+    subparsers.add_argument('--opt-betas', default=(0.9, 0.999), type=float, nargs='+', metavar='BETA', help='Optimizer Betas (default: (0.9, 0.999), use opt default)')
+    subparsers.add_argument('--clip-grad', type=float, default=1.0, metavar='NORM',  help='Clip gradient norm (default: None, no clipping)')
     subparsers.add_argument('--momentum', type=float, default=0.9, metavar='M', help='SGD momentum (default: 0.9)')
     subparsers.add_argument('--weight-decay', type=float, default=0.0, help='weight decay (default: 0.0)')
     subparsers.add_argument('--reinit_optimizer', type=bool, default=True, help='reinit optimizer (default: True)')
-
+    
+    # Loss weight parameters
+    subparsers.add_argument('--backbone_feat_cls_weight', type=float, default=1.0)
+    subparsers.add_argument('--map_metric_cls_weight', type=float, default=0.0)
+    subparsers.add_argument('--primitive_recon_cls_weight', type=float, default=0.0)
+    subparsers.add_argument('--ft_prim_recon_tau', type=float, default=16.0)
+    
+    subparsers.add_argument('--map_pow', type=float, default=1.0)
+    subparsers.add_argument('--bkb_feat_pow', type=float, default=1.0)
+    subparsers.add_argument('--aux_param', type=float, default=1.0)
+    subparsers.add_argument('--temperature', type=float, default=1.0)
+    subparsers.add_argument('--comp_lr', type=float, default=0.005, metavar='COMP-LR', help='compositional head learning rate (default: 0.005)')
+    
     # Learning rate schedule parameters
     subparsers.add_argument('--sched', default='constant', type=str, metavar='SCHEDULER',
                             help='LR scheduler (default: "constant"')
@@ -116,6 +124,7 @@ def get_args_parser(subparsers):
                             type=str, help='input type of classification head')
     subparsers.add_argument('--freeze', default=['blocks', 'patch_embed', 'cls_token', 'norm', 'pos_embed'], nargs='*',
                             type=list, help='freeze part in backbone model')
-
+    subparsers.add_argument('--composition', default=False,  type=bool, help='if using composition learning')
+    
     # Misc parameters
     subparsers.add_argument('--print_freq', type=int, default=10, help='The frequency of printing')

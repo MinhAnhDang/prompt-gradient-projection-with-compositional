@@ -65,7 +65,7 @@ def get_args_parser(subparsers):
 
     # Data parameters
     subparsers.add_argument('--data-path', default='./datasets/', type=str, help='dataset path')
-    subparsers.add_argument('--dataset', default='Split-CIFAR100', type=str, help='dataset name')
+    subparsers.add_argument('--dataset', default='Split-Imagenet-R', type=str, help='dataset name')
     subparsers.add_argument('--shuffle', default=False, help='shuffle the data order')
     subparsers.add_argument('--output_dir', default='./output', help='path where to save, empty for no saving')
     subparsers.add_argument('--device', default='cuda', help='device to use for training / testing')
