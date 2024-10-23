@@ -37,7 +37,7 @@ def get_rep(model, original_model, mem_example, task_id):
 
 
 def update_memory(representation, threshold, feature=None):
-    representation = np.matmul(representation.T, representation.T)
+    representation = np.matmul(representation.T, representation)
     if feature is None:
         U, S, Vh = np.linalg.svd(representation, full_matrices=False)
         sval_total = S.sum()
