@@ -352,18 +352,18 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
         # if task_id != 0:        
         #     args.epochs = 15
             
-        for epoch in range(args.epochs):
-            train_stats = train_one_epoch(model=model, original_model=original_model, criterion=criterion,
-                                        data_loader=data_loader[task_id]['train'], optimizer=optimizer, device=device,
-                                        epoch=epoch, feature_mat=feature_mat, key_feature_mat=key_feature_mat, max_norm=args.clip_grad,
-                                        set_training_mode=True, task_id=task_id, class_mask=class_mask, args=args)
+        # for epoch in range(args.epochs):
+        #     train_stats = train_one_epoch(model=model, original_model=original_model, criterion=criterion,
+        #                                 data_loader=data_loader[task_id]['train'], optimizer=optimizer, device=device,
+        #                                 epoch=epoch, feature_mat=feature_mat, key_feature_mat=key_feature_mat, max_norm=args.clip_grad,
+        #                                 set_training_mode=True, task_id=task_id, class_mask=class_mask, args=args)
 
-            if lr_scheduler:
-                lr_scheduler.step(epoch)
+        #     if lr_scheduler:
+        #         lr_scheduler.step(epoch)
                 
-        # Evaluating
-        test_stats = evaluate_till_now(model=model, original_model=original_model, data_loader=data_loader, device=device, 
-                                       task_id=task_id, class_mask=class_mask, acc_matrix=acc_matrix, args=args)
+        # # Evaluating
+        # test_stats = evaluate_till_now(model=model, original_model=original_model, data_loader=data_loader, device=device, 
+        #                                task_id=task_id, class_mask=class_mask, acc_matrix=acc_matrix, args=args)
         
         #Update feature matrix, key_feature matrix
         if not args.no_pgp:
@@ -372,7 +372,7 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             mem_example = memory.get_representation_matrix(data_loader[task_id]['mem'], device)
             # rep, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
             _, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
-            rep = model.proto[task_id].permute(0,2,1).reshape(-1, 768).detach().cpu().numpy()
+            rep = model.proto[task_id].permute(0,2,1).reshape(-1, 768).detach().cpu().numpy().transpose(1, 0)
             
             # rep = torch.cat(rep)
             # rep = rep.detach().cpu().numpy()
@@ -381,49 +381,50 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             pca = pca.fit(rep)
             rep = pca.transform(rep)
             
-            # print(rep.shape)
+            print(rep.shape)
             # if task_id != 0:
             for k, (m, params) in enumerate(model.named_parameters()):
                 if m == "prompt.prompt":
                     p_ = params.data
-                    p_ = p_.view(-1, 768).detach().cpu().numpy()#.transpose(1, 0)
+                    p_ = p_.view(-1, 768).detach().cpu().numpy().transpose(1, 0)
 
             pca = PCA(n_components=9)
             pca = pca.fit(p_)
             p = pca.transform(p_)
             # rep = rep + p
             rep = np.concatenate((rep, p), axis=0) #Replace element-wise summation with concatenation
-               
+            print(rep.shape)
+            
             rep_key = torch.cat(rep_key)
-            rep_key = rep_key.detach().cpu().numpy()
+            rep_key = rep_key.detach().cpu().numpy().transpose(1, 0)
             pca = PCA(n_components=5)
             pca = pca.fit(rep_key)
             rep_key = pca.transform(rep_key)
-
-            feature = memory.update_memory(rep, 0.6, feature)
+            print(rep_key.shape)
+            feature = memory.update_memory(rep.T, 0.6, feature)
             key_feature = memory.update_memory(rep_key, 0.97, key_feature)
 
         
-        if args.output_dir and utils.is_main_process():
-            Path(os.path.join(args.output_dir, 'checkpoint')).mkdir(parents=True, exist_ok=True)
+        # if args.output_dir and utils.is_main_process():
+        #     Path(os.path.join(args.output_dir, 'checkpoint')).mkdir(parents=True, exist_ok=True)
             
-            checkpoint_path = os.path.join(args.output_dir, 'checkpoint/task{}_checkpoint.pth'.format(task_id+1))
-            state_dict = {
-                    'model': model_without_ddp.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'epoch': epoch,
-                    'args': args,
-                }
-            if args.sched is not None and args.sched != 'constant':
-                state_dict['lr_scheduler'] = lr_scheduler.state_dict()
+        #     checkpoint_path = os.path.join(args.output_dir, 'checkpoint/task{}_checkpoint.pth'.format(task_id+1))
+        #     state_dict = {
+        #             'model': model_without_ddp.state_dict(),
+        #             'optimizer': optimizer.state_dict(),
+        #             'epoch': epoch,
+        #             'args': args,
+        #         }
+        #     if args.sched is not None and args.sched != 'constant':
+        #         state_dict['lr_scheduler'] = lr_scheduler.state_dict()
             
-            utils.save_on_master(state_dict, checkpoint_path)
+        #     utils.save_on_master(state_dict, checkpoint_path)
 
-        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-            **{f'test_{k}': v for k, v in test_stats.items()},
-            'epoch': epoch,}
+        # log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
+        #     **{f'test_{k}': v for k, v in test_stats.items()},
+        #     'epoch': epoch,}
 
-        if args.output_dir and utils.is_main_process():
-            with open(os.path.join(args.output_dir, '{}_stats.txt'.format(datetime.datetime.now().strftime('log_%Y_%m_%d_%H_%M'))), 'a') as f:
-                f.write(json.dumps(log_stats) + '\n')
+        # if args.output_dir and utils.is_main_process():
+        #     with open(os.path.join(args.output_dir, '{}_stats.txt'.format(datetime.datetime.now().strftime('log_%Y_%m_%d_%H_%M'))), 'a') as f:
+        #         f.write(json.dumps(log_stats) + '\n')
 
