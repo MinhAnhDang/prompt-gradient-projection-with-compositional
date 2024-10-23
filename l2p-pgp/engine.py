@@ -372,15 +372,15 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             mem_example = memory.get_representation_matrix(data_loader[task_id]['mem'], device)
             # rep, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
             _, rep_key = memory.get_rep(model, original_model, mem_example, task_id)
+            rep = model.proto[task_id].permute(0,2,1).reshape(-1, 768).detach().cpu().numpy()
             
             # rep = torch.cat(rep)
             # rep = rep.detach().cpu().numpy()
             
-            # pca = PCA(n_components=9)
-            # pca = pca.fit(rep)
-            # rep = pca.transform(rep)
+            pca = PCA(n_components=9)
+            pca = pca.fit(rep)
+            rep = pca.transform(rep)
             
-            rep = model.proto[task_id].permute(0,2,1).reshape(-1, 768).detach().cpu().numpy()
             # print(rep.shape)
             # if task_id != 0:
             for k, (m, params) in enumerate(model.named_parameters()):
@@ -388,17 +388,17 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
                     p_ = params.data
                     p_ = p_.view(-1, 768).detach().cpu().numpy()#.transpose(1, 0)
 
-                # pca = PCA(n_components=9)
-                # pca = pca.fit(p_)
-                # p = pca.transform(p_)
-                # rep = rep + p
-            rep = np.concatenate((rep, p_), axis=0) #Replace element-wise summation with concatenation
+            pca = PCA(n_components=9)
+            pca = pca.fit(p_)
+            p = pca.transform(p_)
+            # rep = rep + p
+            rep = np.concatenate((rep, p), axis=0) #Replace element-wise summation with concatenation
                
             rep_key = torch.cat(rep_key)
             rep_key = rep_key.detach().cpu().numpy()
-            # pca = PCA(n_components=5)
-            # pca = pca.fit(rep_key)
-            # rep_key = pca.transform(rep_key)
+            pca = PCA(n_components=5)
+            pca = pca.fit(rep_key)
+            rep_key = pca.transform(rep_key)
 
             feature = memory.update_memory(rep, 0.6, feature)
             key_feature = memory.update_memory(rep_key, 0.97, key_feature)
