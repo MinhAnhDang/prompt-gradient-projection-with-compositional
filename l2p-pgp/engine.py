@@ -349,8 +349,8 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
         print("----------------Training----------------")            
         
         # Training
-        if task_id != 0:        
-            args.epochs = 15
+        # if task_id != 0:        
+        #     args.epochs = 15
             
         for epoch in range(args.epochs):
             train_stats = train_one_epoch(model=model, original_model=original_model, criterion=criterion,
