@@ -391,8 +391,8 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             pca = PCA(n_components=9)
             pca = pca.fit(p_)
             p = pca.transform(p_)
-            # rep = rep + p
-            rep = np.concatenate((rep, p), axis=0) #Replace element-wise summation with concatenation
+            rep = rep + p
+            # rep = np.concatenate((rep, p), axis=0) #Replace element-wise summation with concatenation
             print(rep.shape)
             
             rep_key = torch.cat(rep_key)
