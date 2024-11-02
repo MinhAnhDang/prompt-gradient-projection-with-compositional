@@ -347,9 +347,12 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             optimizer = create_optimizer(args, parameters)
             
         print("----------------Training----------------")            
-        
+        if task_id == 0:
+            epochs = 25
+        else:
+            epochs = args.epochs
         #Training   
-        for epoch in range(args.epochs):
+        for epoch in range(epochs):
             train_stats = train_one_epoch(model=model, original_model=original_model, criterion=criterion,
                                         data_loader=data_loader[task_id]['train'], optimizer=optimizer, device=device,
                                         epoch=epoch, feature_mat=feature_mat, key_feature_mat=key_feature_mat, max_norm=args.clip_grad,
