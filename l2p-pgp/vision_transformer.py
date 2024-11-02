@@ -336,7 +336,7 @@ class VisionTransformer(nn.Module):
             weight_init='', embed_layer=PatchEmbed, norm_layer=None, act_layer=None, block_fn=Block,
             prompt_length=None, embedding_key='cls', prompt_init='uniform', prompt_pool=False, prompt_key=False, pool_size=None,
             top_k=None, batchwise_prompt=False, prompt_key_init='uniform', head_type='token', composition=False, use_prompt_mask=False,
-            map_pow=1.0, aux_param=1.0, temperature=1.0, ft_prim_recon_tau=16.0):
+            map_pow=1.0, aux_param=1.0, temperature=1.0, ft_prim_recon_tau=16.0, base_classes=50, incremental_classes=10):
         """
         Args:
             img_size (int, tuple): input image size
@@ -372,7 +372,7 @@ class VisionTransformer(nn.Module):
         self.img_size = img_size
         self.num_classes = num_classes
         self.num_tasks = num_tasks
-        self.classes_per_task = int(self.num_classes/self.num_tasks)
+        # self.classes_per_task = int(self.num_classes/self.num_tasks)
         self.global_pool = global_pool
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.class_token = class_token
@@ -419,14 +419,18 @@ class VisionTransformer(nn.Module):
         self.fc_norm = norm_layer(embed_dim) if use_fc_norm else nn.Identity()
         
         self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        self.base_classes = base_classes 
+        self.incremental_classes = incremental_classes
+        self.classes = [base_classes]+[incremental_classes for _ in range(num_tasks-1)]
+        # print("Classes: ", self.classes)
         if self.composition:
-            self.proto = nn.ParameterList(nn.Parameter(torch.empty(self.classes_per_task, self.embed_dim, 16)) for _ in range(num_tasks))
+            self.proto = nn.ParameterList(nn.Parameter(torch.empty(classes_per_task, self.embed_dim, 16)) for classes_per_task in self.classes)
             for i in range(num_tasks):
                 nn.init.kaiming_uniform_(self.proto[i], a=math.sqrt(5))
             # self.fc_map_base = nn.Parameter(torch.empty(num_classes, self.embed_dim, 16))
             # nn.init.kaiming_uniform_(self.fc_map_base, a=math.sqrt(5))
             self.fc_map_temperature = nn.Parameter(torch.tensor(16.0))
-        
+            # print([proto.shape for proto in self.proto])
         if weight_init != 'skip':
             self.init_weights(weight_init)
 
@@ -547,7 +551,7 @@ class VisionTransformer(nn.Module):
             sims = sims.view(bc, s, bc, s)
             # print("Sims shape", sims.shape)
             
-            sims_mask = torch.eye(self.classes_per_task, dtype=torch.int32).unsqueeze(1).unsqueeze(-1)
+            sims_mask = torch.eye(self.base_classes, dtype=torch.int32).unsqueeze(1).unsqueeze(-1)
             sims_mask = sims_mask.to(device)
             # print("Sims mask shape", sims_mask.shape)
             other_sims = sims - sims_mask*9999

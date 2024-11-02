@@ -169,9 +169,13 @@ def get_dataset(dataset, transform_train, transform_val, args,):
 
 
 def split_single_dataset(dataset_train, dataset_val, args):
+    base_classes = args.base_classes
+    incremental_classes = args.incremental_classes
+    classes = [base_classes]+[incremental_classes for _ in range(args.num_tasks - 1)]
     nb_classes = len(dataset_val.classes)
-    assert nb_classes % args.num_tasks == 0
-    classes_per_task = nb_classes // args.num_tasks
+    assert nb_classes == base_classes + incremental_classes * (args.num_tasks - 1)
+    # assert nb_classes % args.num_tasks == 0
+    # classes_per_task = nb_classes // args.num_tasks
 
     labels = [i for i in range(nb_classes)]
     
@@ -181,12 +185,12 @@ def split_single_dataset(dataset_train, dataset_val, args):
     if args.shuffle:
         random.shuffle(labels)
 
-    for _ in range(args.num_tasks):
+    for i in range(args.num_tasks):
         train_split_indices = []
         test_split_indices = []
         
-        scope = labels[:classes_per_task]
-        labels = labels[classes_per_task:]
+        scope = labels[:classes[i]]
+        labels = labels[classes[i]:]
 
         mask.append(scope)
 

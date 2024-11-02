@@ -81,6 +81,8 @@ def main(args):
         map_pow = args.map_pow,
         aux_param = args.aux_param,
         ft_prim_recon_tau = args.ft_prim_recon_tau,
+        base_classes = args.base_classes,
+        incremental_classes=args.incremental_classes,
     )
     original_model.to(device)
     model.to(device)  
