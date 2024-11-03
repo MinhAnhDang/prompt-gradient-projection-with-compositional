@@ -129,6 +129,7 @@ def main(args):
     else:
         global_batch_size = args.batch_size * args.world_size
     args.lr = args.lr * global_batch_size / 256.0
+    args.comp_lr = args.comp_lr * global_batch_size/256
 
     
     # Distinct learning rate for proto and others parameters
