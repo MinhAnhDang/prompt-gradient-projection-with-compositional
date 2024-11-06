@@ -335,6 +335,7 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
         if task_id > 0 and args.reinit_optimizer:
             # Double compositional learning rate after each task
             args.lr = args.lr * 0.5 if args.lr < 0.1 else args.lr
+            args.comp_lr = args.comp_lr * 0.5 if args.comp_lr < 0.1 else args.comp_lr
             
             # optimizer = create_optimizer(args, model)
             proto = [p for name, p in model.named_parameters() if 'proto' in name]
@@ -348,7 +349,7 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
             
         print("----------------Training----------------")            
         if task_id == 0:
-            epochs = 25
+            epochs = args.epochs * 5
         else:
             epochs = args.epochs
         #Training   
@@ -360,6 +361,8 @@ def train_and_evaluate(model: torch.nn.Module, model_without_ddp: torch.nn.Modul
 
             if lr_scheduler:
                 lr_scheduler.step(epoch)
+                # print("Group 0:",lr_scheduler.optimizer.param_groups[0]['lr'])
+                # print("Group 1:",lr_scheduler.optimizer.param_groups[1]['lr'])
                 
         # Evaluating
         test_stats = evaluate_till_now(model=model, original_model=original_model, data_loader=data_loader, device=device, 
